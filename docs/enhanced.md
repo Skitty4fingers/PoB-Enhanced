@@ -220,7 +220,9 @@ PoB2-Enhanced adds a Spirit/totem budget on top of PoB's outputs (`engine/pobapi
   so anything that costs totems or Spirit shows up as lost damage, with `totemsDelta` / `spiritDelta` on each row
 - what-ifs that replace an item also drop the skills that item granted (e.g. Sacred Flame's Purity of Fire)
 
-The sidebar shows Spirit in use, what reserves it, totems and the Spirit needed for the next one. **Check item**
+The sidebar summary card (`GET /api/budget`) leads with DPS and EHP, then the resources the character has (Mana,
+Spirit, Rage, Runic Ward) with net regen against the main skill's cost per second, Spirit reservations, totems and
+the Spirit needed for the next one. Totems are counted for Spirit even when another skill is the main skill. **Check item**
 (Upgrades tab, Items tab, `check_item`) gives an upgrade/sidegrade/downgrade verdict with warnings for lost totems,
 Spirit shortfalls, attribute requirements and removed skills, and each damage skill measured separately. The Items
 tab asks for confirmation before equipping an item that has warnings.

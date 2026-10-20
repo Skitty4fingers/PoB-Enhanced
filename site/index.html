@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PoB-Enhanced</title>
+  <meta name="description" content="Path of Building 2 for Path of Exile 2 as a self-hosted web app, with build advisors, check-before-you-buy, a socket optimiser and an MCP server for AI agents.">
+  <meta property="og:title" content="PoB-Enhanced">
+  <meta property="og:description" content="Path of Building 2 as a self-hosted web app with build advisors and an MCP server.">
+  <meta property="og:image" content="images/tree-advisor.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23c8a24a' stroke-width='6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./"><span class="logo"></span> PoB-Enhanced</a>
+      <nav>
+        <a href="#features" class="hide-sm">Features</a>
+        <a href="#tour" class="hide-sm">Tour</a>
+        <a href="deploy.html">Deploy</a>
+        <a href="https://github.com/Skitty4fingers/PoB-Enhanced">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="tag">Path of Exile 2 · self-hosted</div>
+        <h1>Path of Building 2, <span>in your browser</span></h1>
+        <p class="lead">PoB-Enhanced runs the real Path of Building calculator in a Docker container and adds a web UI,
+          build advisors, a <strong>check before you buy</strong> tool, a socket optimiser and an MCP server for AI agents.
+          Every number is measured in <strong>your</strong> build.</p>
+        <div class="actions">
+          <a class="btn primary" href="deploy.html">Deploy it in 5 minutes →</a>
+          <a class="btn" href="https://github.com/Skitty4fingers/PoB-Enhanced">View on GitHub</a>
+        </div>
+        <div class="shot"><img src="images/tree-advisor.png" alt="PoB-Enhanced: passive tree with the advisor and the build summary" width="1440" height="900"></div>
+      </div>
+    </section>
+
+    <section class="block" id="features">
+      <div class="wrap">
+        <div class="eyebrow">What you get</div>
+        <h2>Everything PoB calculates, with advice on top</h2>
+        <p class="intro">The calculation engine is Path of Building Community's own, unmodified. PoB-Enhanced runs it
+          headless and builds the tools you reach for between maps.</p>
+        <div class="grid">
+          <div class="card"><h3><span class="ico">⌁</span> Passive advisor</h3><p>The best next point with its path, the cheapest point to move, and which +5 attribute nodes to switch.</p></div>
+          <div class="card"><h3><span class="ico">✓</span> Check before you buy</h3><p>Paste any item for an upgrade / sidegrade / downgrade verdict across every skill, with totem, Spirit and requirement warnings.</p></div>
+          <div class="card"><h3><span class="ico">◎</span> Socket optimiser</h3><p>What every rune, soul core and idol is worth, the best legal swaps, and a combined plan that respects every limit.</p></div>
+          <div class="card"><h3><span class="ico">⬡</span> Gear, gems and shop</h3><p>Mod worth with dead mods flagged, weighted trade searches, support swaps, and uniques ranked with poe.ninja prices.</p></div>
+          <div class="card"><h3><span class="ico">≡</span> Build guides</h3><p>Upload a Maxroll or in-game planner <code>.build</code> file and see the gap: passives, skills, gear, and next steps by gain per point.</p></div>
+          <div class="card"><h3><span class="ico">✦</span> AI agents (MCP)</h3><p>About 50 tools let Claude or any MCP client load, what-if and edit your build. The UI updates live as the agent works.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="tour">
+      <div class="wrap">
+        <div class="eyebrow">Tour</div>
+        <h2>A quick look around</h2>
+        <p class="intro">Screens from a real level 87 Oracle totem build.</p>
+
+        <div class="feature">
+          <div class="text">
+            <h3>Your build at a glance</h3>
+            <ul>
+              <li><strong>DPS and EHP</strong> up front. Totem skills count every totem your Spirit can keep up.</li>
+              <li>Only the resources you use: Mana, Spirit, Rage or Runic Ward, with net regen against skill cost.</li>
+              <li>Green and red chips show what your last change did. Hover for defences, resists and reservations.</li>
+            </ul>
+          </div>
+          <div class="media" style="max-width:320px;justify-self:center"><img src="images/summary-card.png" alt="Build summary card" loading="lazy"></div>
+        </div>
+
+        <div class="feature flip">
+          <div class="text">
+            <h3>Check before you buy</h3>
+            <ul>
+              <li>Ctrl+C an item in game or on trade, paste it, get a verdict.</li>
+              <li>Each damage skill measured separately, plus defences.</li>
+              <li>Warnings for lost totems, Spirit shortfalls, attribute requirements and skills the swap removes.</li>
+            </ul>
+          </div>
+          <div class="media"><img src="images/check-item.png" alt="Check item verdict" loading="lazy"></div>
+        </div>
+
+        <div class="feature">
+          <div class="text">
+            <h3>Sockets, optimised</h3>
+            <ul>
+              <li>Every legal rune, soul core and idol tried in every socket.</li>
+              <li>Corruption, level, per-item and character-wide limits (like Ancient Augment) respected.</li>
+              <li>A plan of swaps measured together, including paired swaps that free a limit.</li>
+            </ul>
+          </div>
+          <div class="media"><img src="images/sockets.png" alt="Socket optimiser" loading="lazy"></div>
+        </div>
+
+        <div class="feature flip">
+          <div class="text">
+            <h3>Gear and shop</h3>
+            <ul>
+              <li>What each item and mod is worth, sorted by room for improvement.</li>
+              <li>A weighted pathofexile.com trade search per slot.</li>
+              <li>Uniques that would help most, with poe.ninja prices and a budget filter.</li>
+            </ul>
+          </div>
+          <div class="media"><img src="images/upgrades-gear.png" alt="Gear advice" loading="lazy"></div>
+        </div>
+
+        <div class="feature">
+          <div class="text">
+            <h3>Help built in</h3>
+            <p>The Help tab walks through importing your character and every tool, so nobody needs this page to get started.</p>
+            <a class="btn primary" href="deploy.html">Set it up →</a>
+          </div>
+          <div class="media"><img src="images/help.png" alt="In-app help guide" loading="lazy"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="eyebrow">Get started</div>
+        <h2>One command with Docker</h2>
+        <pre><code>docker run -d --name pob-enhanced --restart unless-stopped -p 8080:8080 ghcr.io/skitty4fingers/pob-enhanced:latest</code></pre>
+        <p>Then open <a href="http://localhost:8080">http://localhost:8080</a> and import your character.
+          NAS, Compose, Tailscale and no-Docker setups are in the <a href="deploy.html">deployment guide</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Built on <a href="https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2">Path of Building Community (PoE2)</a>. Prices from <a href="https://poe.ninja">poe.ninja</a>. MIT licence.</span>
+      <span>Not affiliated with Grinding Gear Games, Path of Building Community or poe.ninja.</span>
+    </div>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>

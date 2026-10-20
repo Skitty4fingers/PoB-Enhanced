@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Download, FilePlus2, Radio, RefreshCw, Upload } from "lucide-react";
+import { CircleHelp, Download, FilePlus2, Radio, RefreshCw, Upload } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
 import { useBuildMutation } from "../api/hooks";
@@ -72,6 +72,7 @@ export function Header({ info, revision }: { info?: BuildInfo; revision?: number
         <button className="btn" onClick={() => setDialog("new")}><FilePlus2 size={14} /> New</button>
         <button className="btn" onClick={() => setDialog("import")}><Upload size={14} /> Import</button>
         <button className="btn btn-primary" onClick={() => setDialog("export")}><Download size={14} /> Export</button>
+        <button className="btn btn-ghost" onClick={() => { window.location.hash = "help"; }} title="Help guide" aria-label="Help guide"><CircleHelp size={16} /></button>
       </div>
       {dialog === "import" && <ImportDialog onClose={close} />}
       {dialog === "export" && <ExportDialog onClose={close} />}

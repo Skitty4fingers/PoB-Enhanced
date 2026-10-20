@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy PoB-Enhanced</title>
+  <meta name="description" content="Step-by-step deployment guide for PoB-Enhanced: Docker Desktop, Compose, TrueNAS, Unraid, Synology, Portainer, Tailscale and running without Docker.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23c8a24a' stroke-width='6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./"><span class="logo"></span> PoB-Enhanced</a>
+      <nav>
+        <a href="./#features" class="hide-sm">Features</a>
+        <a href="./#tour" class="hide-sm">Tour</a>
+        <a href="deploy.html" class="on">Deploy</a>
+        <a href="https://github.com/Skitty4fingers/PoB-Enhanced">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap guide">
+    <aside class="toc" aria-label="On this page">
+      <div class="label">On this page</div>
+      <a href="#choose">Choose a setup</a>
+      <a href="#docker">Docker Desktop</a>
+      <a href="#compose">Docker Compose</a>
+      <a href="#network">Open it to your network</a>
+      <a href="#truenas">TrueNAS SCALE</a>
+      <a href="#unraid">Unraid</a>
+      <a href="#portainer">Portainer / Synology</a>
+      <a href="#tailscale">Tailscale (HTTPS)</a>
+      <a href="#source">Build from source</a>
+      <a href="#nodocker">Without Docker</a>
+      <a href="#first-run">First run</a>
+      <a href="#mcp">Connect an AI agent</a>
+      <a href="#update">Updating</a>
+      <a href="#settings">Settings</a>
+      <a href="#trouble">Troubleshooting</a>
+    </aside>
+
+    <article class="doc">
+      <h1>Deployment guide</h1>
+      <p>PoB-Enhanced is one container. It needs no database and no storage, and it serves the web UI, the REST API and
+        the MCP endpoint on a single port (<code>8080</code>). Pick the setup that matches where you want it to run.</p>
+
+      <h2 id="choose">Choose a setup</h2>
+      <div class="choose">
+        <a href="#docker"><span class="meta">Easiest · 5 min</span><strong>Docker Desktop</strong>Your own Windows or Mac PC.</a>
+        <a href="#truenas"><span class="meta">Always on</span><strong>NAS or home server</strong>TrueNAS, Unraid, Synology, Portainer.</a>
+        <a href="#tailscale"><span class="meta">Private HTTPS</span><strong>Tailscale</strong>Reach it from your phone and laptop anywhere, no open ports.</a>
+        <a href="#nodocker"><span class="meta">Developers</span><strong>Without Docker</strong>Linux, macOS or WSL with Python and Node.</a>
+      </div>
+      <div class="note warn"><p><strong>There is no login.</strong> Anyone who can reach the port can view and change
+        the loaded build. Keep it on your own PC, a trusted home network, or a tailnet. Never forward the port to the
+        internet.</p></div>
+
+      <h2 id="docker">Docker Desktop (Windows and macOS)</h2>
+      <ol class="steps">
+        <li>Install <a href="https://docs.docker.com/get-docker/">Docker Desktop</a> and start it. On Windows, accept the
+          WSL 2 option when the installer asks.</li>
+        <li>Open a terminal (PowerShell on Windows, Terminal on macOS) and run:
+          <pre><code>docker run -d --name pob-enhanced --restart unless-stopped -p 8080:8080 ghcr.io/skitty4fingers/pob-enhanced:latest</code></pre>
+          The first start downloads the image (a few hundred MB).</li>
+        <li>Open <a href="http://localhost:8080">http://localhost:8080</a>. Continue with <a href="#first-run">First run</a>.</li>
+      </ol>
+      <p>Port 8080 taken? Use another host port, for example <code>-p 8090:8080</code>, and open
+        <code>http://localhost:8090</code>.</p>
+
+      <h2 id="compose">Docker Compose</h2>
+      <p>Compose keeps the settings in a file and makes updates one command.</p>
+      <ol class="steps">
+        <li>Download the Compose file:
+          <pre><code>curl -O https://raw.githubusercontent.com/Skitty4fingers/PoB-Enhanced/main/compose.image.yml</code></pre></li>
+        <li>Optional: create a <code>.env</code> file next to it (see <a href="#settings">Settings</a>), for example:
+          <pre><code>POB2_PORT=8080
+POB2_BIND=127.0.0.1</code></pre></li>
+        <li>Start it:
+          <pre><code>docker compose -f compose.image.yml up -d</code></pre></li>
+      </ol>
+      <p>The Compose file listens on <code>127.0.0.1</code> by default, so only this machine can reach it. See the next
+        section to open it up.</p>
+
+      <h2 id="network">Open it to your network</h2>
+      <p>To use it from another PC, a tablet or your phone on the same network:</p>
+      <ol class="steps">
+        <li>In <code>.env</code>, set <code>POB2_BIND=0.0.0.0</code> (Compose only; <code>docker run -p 8080:8080</code>
+          already listens on every address).</li>
+        <li>Set <code>POB2_ALLOWED_HOSTS</code> to the names and IPs other devices will type, for example
+          <code>POB2_ALLOWED_HOSTS=gaming-pc,192.168.1.20</code>. The web UI works without it; the MCP endpoint
+          (<code>/mcp</code>) rejects unknown host names to block DNS-rebinding attacks.</li>
+        <li>Restart: <code>docker compose -f compose.image.yml up -d</code>, then browse to
+          <code>http://192.168.1.20:8080</code> from the other device.</li>
+      </ol>
+
+      <h2 id="truenas">TrueNAS SCALE</h2>
+      <ol class="steps">
+        <li>Open <strong>Apps → Discover Apps</strong> and click <strong>Custom App</strong>.</li>
+        <li><strong>Application name:</strong> <code>pob-enhanced</code>.</li>
+        <li><strong>Image:</strong> repository <code>ghcr.io/skitty4fingers/pob-enhanced</code>, tag <code>latest</code>,
+          pull policy <strong>Always pull</strong> (so a restart picks up new versions).</li>
+        <li><strong>Environment variables:</strong> add <code>POB2_ALLOWED_HOSTS</code> with your NAS name and IP, for
+          example <code>truenas,192.168.1.147</code>.</li>
+        <li><strong>Network → Ports:</strong> container port <code>8080</code>, host port <code>8080</code> (or any free
+          port), protocol TCP.</li>
+        <li><strong>Storage:</strong> none needed. Click <strong>Install</strong>.</li>
+        <li>When the app shows <em>Running</em>, open <code>http://&lt;nas&gt;:8080</code>.</li>
+      </ol>
+      <p>To update, stop and start the app (with <em>Always pull</em> it fetches the newest image).</p>
+
+      <h2 id="unraid">Unraid</h2>
+      <ol class="steps">
+        <li>Go to <strong>Docker → Add Container</strong>.</li>
+        <li><strong>Name:</strong> <code>pob-enhanced</code>, <strong>Repository:</strong>
+          <code>ghcr.io/skitty4fingers/pob-enhanced:latest</code>, <strong>Network type:</strong> Bridge.</li>
+        <li><strong>Add another Path, Port, Variable…</strong> → Port: container <code>8080</code>, host <code>8080</code>.</li>
+        <li><strong>Add another Path, Port, Variable…</strong> → Variable: key <code>POB2_ALLOWED_HOSTS</code>, value
+          <code>tower,192.168.1.30</code> (your server's name and IP).</li>
+        <li>Click <strong>Apply</strong>, then open <code>http://&lt;server&gt;:8080</code>. Update from the Docker tab with
+          <strong>Check for updates</strong>.</li>
+      </ol>
+
+      <h2 id="portainer">Portainer or Synology Container Manager</h2>
+      <p>Create a <strong>stack</strong> (Portainer: <em>Stacks → Add stack</em>; Synology: <em>Container Manager →
+        Project → Create</em>) with this Compose file:</p>
+      <pre><code>services:
+  pob2:
+    image: ghcr.io/skitty4fingers/pob-enhanced:latest
+    ports:
+      - "8080:8080"
+    environment:
+      POB2_ALLOWED_HOSTS: "nas,192.168.1.20"   <span class="c"># the names/IPs you browse to</span>
+    restart: unless-stopped</code></pre>
+      <p>Deploy it and open <code>http://&lt;nas&gt;:8080</code>. To update, pull the image again and redeploy the stack.</p>
+
+      <h2 id="tailscale">Tailscale (private HTTPS, no open ports)</h2>
+      <p><code>compose.tailscale.yml</code> puts PoB-Enhanced behind a Tailscale sidecar with a real certificate. Only
+        devices on your tailnet can reach it, at <code>https://pob2.&lt;tailnet&gt;.ts.net</code>.</p>
+      <ol class="steps">
+        <li>In the Tailscale <a href="https://login.tailscale.com/admin/dns">admin console</a>, enable
+          <strong>MagicDNS</strong> and <strong>HTTPS Certificates</strong>, and note your tailnet name (like
+          <code>tail1234.ts.net</code>).</li>
+        <li>Create an <a href="https://login.tailscale.com/admin/settings/keys">auth key</a>.</li>
+        <li>Get the code and settings:
+          <pre><code>git clone https://github.com/Skitty4fingers/PoB-Enhanced.git
+cd PoB-Enhanced
+cp .env.example .env      <span class="c"># set TS_AUTHKEY and TS_TAILNET</span></code></pre></li>
+        <li>Start it:
+          <pre><code>docker compose -f compose.tailscale.yml up -d --build</code></pre></li>
+        <li>Open <code>https://pob2.&lt;tailnet&gt;.ts.net</code> from any device on your tailnet.</li>
+      </ol>
+      <div class="note"><p>Without an auth key, <code>docker compose -f compose.tailscale.yml logs tailscale</code> prints a
+        login link. Funnel (public exposure) is disabled.</p></div>
+
+      <h2 id="source">Build from source</h2>
+      <pre><code>git clone https://github.com/Skitty4fingers/PoB-Enhanced.git
+cd PoB-Enhanced
+docker compose -f compose.enhanced.yml up -d --build</code></pre>
+      <p>The first build takes a few minutes: it compiles LuaJIT and the web UI. To update, run <code>git pull</code>
+        and the same command again.</p>
+
+      <h2 id="nodocker">Without Docker (Linux, macOS, WSL)</h2>
+      <p>You need Python 3.10+, <a href="https://docs.astral.sh/uv/">uv</a>, Node 22+, git and a C compiler.</p>
+      <pre><code>git clone https://github.com/Skitty4fingers/PoB-Enhanced.git
+cd PoB-Enhanced
+scripts/setup-engine.sh                  <span class="c"># builds LuaJIT + lua-utf8, installs Python deps, builds the web UI</span>
+export PATH="$HOME/.local/bin:$PATH"
+uv run --directory python pob2-web       <span class="c"># http://127.0.0.1:8080</span></code></pre>
+      <div class="note"><p>PoB needs LuaJIT from commit <code>2460b3ff</code> (2026-07-20) or newer; distro packages are
+        too old. The setup script builds the right one into <code>~/.local</code>.</p></div>
+
+      <h2 id="first-run">First run</h2>
+      <ol class="steps">
+        <li>Click <strong>Import</strong> and paste a PoB share code, a pobb.in / pastebin link, or your poe.ninja
+          character page: <code>https://poe.ninja/poe2/profile/&lt;account&gt;/&lt;league&gt;/character/&lt;name&gt;</code>.</li>
+        <li>Open the <strong>Config</strong> tab and set enemy conditions, buffs and charges to how you play.</li>
+        <li>Open the <strong>Help</strong> tab (or the <strong>?</strong> button) for a tour of every tool.</li>
+        <li>Later, press <strong>Update</strong> to re-import your character. Config settings are kept.</li>
+      </ol>
+      <div class="note"><p>The build lives in memory. After the container restarts, import again or press
+        <strong>Update</strong>.</p></div>
+
+      <h2 id="mcp">Connect an AI agent (MCP)</h2>
+      <p>The MCP endpoint is <code>/mcp</code> on the same port. For Claude Code:</p>
+      <pre><code>claude mcp add --transport http pob2 http://localhost:8080/mcp</code></pre>
+      <p>From another machine use its address, for example <code>http://192.168.1.20:8080/mcp</code>, and make sure that
+        name or IP is in <code>POB2_ALLOWED_HOSTS</code>. The agent and the web UI share one live build, and the UI
+        refreshes as the agent works.</p>
+      <p>For Claude Desktop or a stdio-only client, run the server over stdio:</p>
+      <pre><code>{
+  "mcpServers": {
+    "pob2": { "command": "docker", "args": ["run", "--rm", "-i", "ghcr.io/skitty4fingers/pob-enhanced:latest", "pob2-mcp"] }
+  }
+}</code></pre>
+
+      <h2 id="update">Updating</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Setup</th><th>Update</th></tr>
+        <tr><td>docker run</td><td><code>docker pull ghcr.io/skitty4fingers/pob-enhanced:latest</code>, then
+          <code>docker rm -f pob-enhanced</code> and run the original command again</td></tr>
+        <tr><td>Compose</td><td><code>docker compose -f compose.image.yml pull &amp;&amp; docker compose -f compose.image.yml up -d</code></td></tr>
+        <tr><td>TrueNAS</td><td>Stop and start the app (pull policy <em>Always</em>)</td></tr>
+        <tr><td>Unraid</td><td>Docker tab → <em>Check for updates</em> → <em>Apply update</em></td></tr>
+        <tr><td>Source / no Docker</td><td><code>git pull</code>, then rebuild or rerun <code>scripts/setup-engine.sh</code></td></tr>
+      </table></div>
+
+      <h2 id="settings">Settings</h2>
+      <div class="table-wrap"><table>
+        <tr><th>Variable</th><th>Default</th><th>What it does</th></tr>
+        <tr><td><code>POB2_PORT</code></td><td><code>8080</code></td><td>Host port (Compose files)</td></tr>
+        <tr><td><code>POB2_BIND</code></td><td><code>127.0.0.1</code></td><td>Address to listen on (Compose). <code>0.0.0.0</code> makes it reachable from your network</td></tr>
+        <tr><td><code>POB2_ALLOWED_HOSTS</code></td><td>none</td><td>Extra host names accepted by <code>/mcp</code>, comma-separated. localhost always works</td></tr>
+        <tr><td><code>POB2_IMAGE</code></td><td><code>ghcr.io/skitty4fingers/pob-enhanced:latest</code></td><td>Image for <code>compose.image.yml</code></td></tr>
+        <tr><td><code>TS_AUTHKEY</code>, <code>TS_TAILNET</code></td><td>none</td><td>Tailscale setup (<code>compose.tailscale.yml</code>)</td></tr>
+      </table></div>
+
+      <h2 id="trouble">Troubleshooting</h2>
+      <details><summary>“port is already allocated” or the page won't load</summary><div>
+        <p>Another program uses port 8080. Pick another host port (<code>-p 8090:8080</code> or
+          <code>POB2_PORT=8090</code>) and open that port instead.</p></div></details>
+      <details><summary>It works on the server but not from my other PC or phone</summary><div>
+        <p>With Compose, set <code>POB2_BIND=0.0.0.0</code> and restart. Check the server's firewall allows the port.</p></div></details>
+      <details><summary>The AI agent can't connect to /mcp (error about the Host header)</summary><div>
+        <p>Add the exact name or IP the agent uses to <code>POB2_ALLOWED_HOSTS</code>, for example
+          <code>POB2_ALLOWED_HOSTS=nas,192.168.1.20</code>, and restart the container.</p></div></details>
+      <details><summary>My build disappeared</summary><div>
+        <p>The build is kept in memory, so a restart or update clears it. Import it again, or press
+          <strong>Update</strong> if you imported from a link.</p></div></details>
+      <details><summary><code>'=' expected near '+'</code> when running without Docker</summary><div>
+        <p>Your LuaJIT is too old. Run <code>scripts/setup-engine.sh</code> and make sure <code>~/.local/bin</code> comes
+          first on your <code>PATH</code> (or set <code>POB2_LUAJIT</code>).</p></div></details>
+      <details><summary>The passive tree shows plain circles</summary><div>
+        <p>The tree artwork is missing. It ships in <code>tree-art/</code> and in the Docker image; if you moved the
+          folder, set <code>POB2_TREE_ART</code> to its path.</p></div></details>
+      <details><summary>Numbers look wrong</summary><div>
+        <p>Check the <strong>Config</strong> tab first: enemy conditions, buffs and charges change every number. Mods
+          PoB can't model are flagged “unmodelled” and count as zero.</p></div></details>
+
+      <p style="margin-top:40px">Still stuck? <a href="https://github.com/Skitty4fingers/PoB-Enhanced/issues">Open an issue</a>
+        with your setup and the container log (<code>docker logs pob-enhanced</code>).</p>
+    </article>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      <span>Built on <a href="https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2">Path of Building Community (PoE2)</a>. MIT licence.</span>
+      <span>Not affiliated with Grinding Gear Games, Path of Building Community or poe.ninja.</span>
+    </div>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>

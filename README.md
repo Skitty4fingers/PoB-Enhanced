@@ -4,11 +4,21 @@
 calculation engine in a Docker container and adds a browser UI, build advisors, a REST API and an MCP server for
 AI agents.
 
+**[Website](https://skitty4fingers.github.io/PoB-Enhanced/) · [Deployment guide](https://skitty4fingers.github.io/PoB-Enhanced/deploy.html) · [Run it](#run-it)**
+
 ![Passive tree with the advisor](docs/images/tree-advisor.png)
 
-Everything below is measured by PoB's own calculator in **your** build, for **your** Config tab settings.
+Everything below is measured by PoB's own calculator in **your** build, for **your** Config tab settings. The app's
+**Help** tab (or the **?** button) walks through every tool.
 
 ## Features
+
+<img src="docs/images/summary-card.png" alt="Build summary card" width="260" align="right">
+
+**Build summary.** The sidebar leads with **DPS** and **EHP**, then only the resources your character uses: Mana,
+Spirit, Rage or Runic Ward, each with net regen against what the main skill spends. It recalculates after every
+change (yours or an AI agent's), shows how much the last change moved DPS and EHP, and breaks down defences,
+resistances and Spirit reservations on hover.
 
 **Passive tree**
 - The game's own PoE2 tree artwork: node icons, frames, socketed jewels, class and ascendancy art, curved orbits.
@@ -22,14 +32,18 @@ Everything below is measured by PoB's own calculator in **your** build, for **yo
   with warnings for lost totems, Spirit shortfalls, attribute requirements and skills the swap removes.
 - **Gear and jewels**: what each item and each mod is worth (dead mods flagged), what to look for on a replacement,
   how much room for improvement each slot has, and a weighted pathofexile.com trade search per slot.
+- **Sockets**: what each rune, soul core and idol is worth and the best legal replacement per socket, respecting
+  corruption, level, per-item and character-wide limits (such as Ancient Augment). **Build plan** orders the swaps
+  and measures them together, including paired swaps that free a limit.
 - **Gems**: what each support is worth, the best replacement for the weakest support in each skill, gem level and
   quality upgrades, and problems like disabled or harmful supports. One click applies a suggestion.
 - **Shop**: every unique that fits a slot, measured in your build, with poe.ninja prices, a budget filter and
   "best value for money".
 
 **Spirit and totems.** PoB reports totem damage per totem and doesn't model Ancestral Bond's Spirit cost per totem.
-PoB-Enhanced tracks your Spirit budget and the totems you can actually keep up, and every advisor uses **DPS across
-all totems**. A weapon that costs you totems shows up as a downgrade.
+PoB-Enhanced tracks your Spirit budget and the totems you can actually keep up (including totem limit bonuses that
+Spell Totem's data hides), and every advisor uses **DPS across all totems**. A weapon that costs you totems shows up
+as a downgrade.
 
 ![Check before you buy](docs/images/check-item.png)
 
@@ -43,13 +57,20 @@ character page** (ladder or profile). The **Update** button re-imports it later 
 **AI agents (MCP).** About 50 tools let Claude or any MCP client load, inspect, what-if and edit builds, using the
 same advisors as the UI. The web UI and an agent share one live build.
 
-| Upgrades: gear | Shop | Guide |
+| Upgrades: gear | Sockets | Shop |
 |---|---|---|
-| ![Gear advice](docs/images/upgrades-gear.png) | ![Shop](docs/images/shop.png) | ![Guide comparison](docs/images/guide.png) |
+| ![Gear advice](docs/images/upgrades-gear.png) | ![Socket optimiser](docs/images/sockets.png) | ![Shop](docs/images/shop.png) |
+
+| Guide | Help |
+|---|---|
+| ![Guide comparison](docs/images/guide.png) | ![In-app help](docs/images/help.png) |
 
 ## Run it
 
-You need [Docker](https://docs.docker.com/get-docker/). Then open **http://localhost:8080**.
+You need [Docker](https://docs.docker.com/get-docker/). Then open **http://localhost:8080**. The
+[deployment guide](https://skitty4fingers.github.io/PoB-Enhanced/deploy.html) has step-by-step instructions for
+Docker Desktop, Compose, TrueNAS, Unraid, Synology/Portainer, Tailscale and running without Docker, plus
+troubleshooting.
 
 ### Option 1: prebuilt image
 
@@ -104,8 +125,10 @@ Requires Python 3.10+, [uv](https://docs.astral.sh/uv/) and Node 22+. The PoE2 t
    (`https://poe.ninja/poe2/profile/<account>/<league>/character/<name>`). Press **Update** whenever your character
    changes.
 2. **Tree**: follow the advisor's NEXT and MOVE markers, or hover any node for its stats and what-if deltas.
-3. **Upgrades**: start with **Check item** before buying anything, then work through Gear, Jewels, Gems and Shop.
+3. **Upgrades**: start with **Check item** before buying anything, then work through Gear, Jewels, Sockets, Gems
+   and Shop.
 4. **Guide**: upload a guide's `.build` file to see how far you are from it.
+5. **Help**: the in-app guide explains every tab, the summary card and the limits of the numbers.
 
 ### Connect an AI agent
 
@@ -140,6 +163,7 @@ and no open ports).
 | `python/` | `pob2` package: engine bridge, REST API (FastAPI), MCP server, CLI, poe.ninja/trade helpers |
 | `web/` | React 19 + Vite + Tailwind UI |
 | `tree-art/` | PoE2 tree artwork as WebP. Regenerate with `scripts/build_tree_art.py` after a tree data update |
+| `site/` | GitHub Pages project site (published by `.github/workflows/pages.yml`, screenshots from `docs/images/`) |
 
 ```bash
 cd python && uv run pytest && uv run ruff check src tests     # tests (engine tests need LuaJIT, or run in Docker)
