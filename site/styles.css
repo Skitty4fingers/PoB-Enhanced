@@ -31,7 +31,8 @@ body {
 }
 a { color: var(--gold-soft); text-decoration: none; }
 a:hover { text-decoration: underline; }
-img { max-width: 100%; display: block; }
+/* height: auto keeps the aspect ratio when max-width shrinks an image with width/height attributes. */
+img { max-width: 100%; height: auto; display: block; }
 h1, h2, h3 { color: var(--ink-200); line-height: 1.25; margin: 0 0 .5em; }
 h1 { font-size: clamp(2rem, 4.5vw, 3.1rem); letter-spacing: -.02em; }
 h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); letter-spacing: -.01em; }
@@ -75,8 +76,10 @@ pre code { overflow-wrap: normal; }
 .hero p.lead { max-width: 720px; margin: 0 auto 28px; font-size: 1.15rem; }
 .hero .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .hero h1 span { color: var(--gold-soft); }
+/* The hero screenshot is wider than the text column: up to 1280px, centred, never past the viewport gutter. */
 .shot {
-  margin: 44px auto 0; border-radius: var(--radius); overflow: hidden;
+  width: min(1280px, calc(100vw - 40px)); margin: 44px 0 0 50%; transform: translateX(-50%);
+  border-radius: var(--radius); overflow: hidden;
   border: 1px solid var(--ink-700); box-shadow: 0 30px 80px -20px rgba(0,0,0,.8), 0 0 0 1px rgba(200,162,74,.08);
 }
 
