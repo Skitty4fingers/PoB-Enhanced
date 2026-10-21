@@ -247,7 +247,7 @@ const SECTIONS: Section[] = [
     icon: <Bot size={15} />,
     body: (
       <>
-        <p>Connect Claude or any MCP client to the same live build. The UI updates as the agent works.</p>
+        <p>Connect Claude, ChatGPT (Codex), Gemini (Antigravity), Grok, Muse, or a self-hosted model (LM Studio, Open WebUI with Ollama, LibreChat) to the same live build. The UI updates as the agent works, and Undo reverses anything it changes. The <Term>AI / MCP</Term> tab has copy-ready settings for each; cloud chat apps need a public HTTPS tunnel.</p>
         <pre className="mt-2 overflow-x-auto rounded border border-ink-700 bg-ink-900 p-2 text-xs text-ink-200">claude mcp add --transport http pob2 {window.location.origin}/mcp</pre>
         <p className="mt-2 text-ink-400">Ask things like &quot;check this item before I buy it&quot;, &quot;what should my next 5 points be?&quot; or &quot;which runes should I swap?&quot;.</p>
         <Open tab="ai">Open AI / MCP</Open>

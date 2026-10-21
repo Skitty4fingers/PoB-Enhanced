@@ -167,12 +167,48 @@ Requires Python 3.10+, [uv](https://docs.astral.sh/uv/) and Node 22+. The PoE2 t
 
 ### Connect an AI agent
 
-```bash
-claude mcp add --transport http pob2 http://localhost:8080/mcp
-```
+The MCP endpoint is `http://localhost:8080/mcp` (Streamable HTTP). The app's **AI / MCP** tab has copy-ready settings
+for each assistant, filled in with your server's address. Agents share the live build with the web UI, and anything
+they change can be undone.
 
-For another machine, set `POB2_ALLOWED_HOSTS` to the hostname you use and connect to `http://<host>:8080/mcp`.
-The tools are listed in [docs/enhanced.md](docs/enhanced.md#connecting-ai-agents-mcp).
+**On your computer** (they reach the server directly):
+
+| Assistant | How |
+|---|---|
+| Claude Code | `claude mcp add --transport http pob2 http://localhost:8080/mcp` |
+| Claude Desktop | `claude_desktop_config.json`: `{"mcpServers": {"pob2": {"command": "npx", "args": ["-y", "mcp-remote", "http://localhost:8080/mcp"]}}}` (Node.js; add `"--allow-http"` for a non-localhost http address) |
+| ChatGPT: Codex CLI | `codex mcp add pob2 --url http://localhost:8080/mcp` |
+| Gemini: Antigravity | `~/.gemini/config/mcp_config.json`: `{"mcpServers": {"pob2": {"serverUrl": "http://localhost:8080/mcp"}}}` (personal Google accounts moved here from Gemini CLI in June 2026) |
+| Gemini CLI | `gemini mcp add --transport http --scope user pob2 http://localhost:8080/mcp` |
+| Cursor, VS Code, Cline, Zed, … | `{"mcpServers": {"pob2": {"url": "http://localhost:8080/mcp"}}}` |
+
+**Self-hosted models** (use a model with tool calling, such as Qwen 3 or Llama 3.1+):
+
+| Client | How |
+|---|---|
+| LM Studio (0.3.17+) | Program → Install → Edit `mcp.json`: `{"mcpServers": {"pob2": {"url": "http://localhost:8080/mcp"}}}` |
+| Open WebUI + Ollama (0.6.31+) | Admin Settings → External Tools → add **MCP (Streamable HTTP)**, auth None, URL `http://host.docker.internal:8080/mcp` |
+| LibreChat | `librechat.yaml`: `mcpServers: { pob2: { type: streamable-http, url: http://host.docker.internal:8080/mcp } }` |
+
+Clients in Docker reach the server through `host.docker.internal` (Linux: `--add-host=host.docker.internal:host-gateway`);
+add that name to `POB2_ALLOWED_HOSTS`. From another machine, use the server's address and add it to
+`POB2_ALLOWED_HOSTS` too.
+
+**Cloud chat apps** (ChatGPT, Grok, the Gemini app, Meta Muse, Claude.ai) connect from their own servers, so they
+need a **public HTTPS address**: run a tunnel (`cloudflared tunnel --url http://localhost:8080` or `ngrok http 8080`),
+add its hostname to `POB2_ALLOWED_HOSTS`, then:
+
+| App | How |
+|---|---|
+| ChatGPT | Settings → Apps & Connectors → Advanced → **Developer mode**, then Connectors → Create: URL `https://<tunnel>/mcp`, no authentication (plan support varies) |
+| Grok | `grok.com/connectors` → New Connector → Custom → `https://<tunnel>/mcp` (paid plans; API: a `{"type": "mcp", "server_url": …}` tool) |
+| Gemini app | Connected Apps → add custom, where your plan offers it (otherwise use Antigravity) |
+| Meta Muse | No MCP menu: ask Muse to connect to `https://<tunnel>/mcp` itself, or add a Custom Connector for the REST API (`/openapi.json`) |
+| Claude.ai | Settings → Connectors → Add custom connector → `https://<tunnel>/mcp` |
+
+PoB-Enhanced has no login: while a tunnel runs, anyone with its address can change the loaded build (Undo brings it
+back). Keep the address private and stop the tunnel when you're done. The tools are listed in
+[docs/enhanced.md](docs/enhanced.md#connecting-ai-agents-mcp).
 
 ## Configuration
 

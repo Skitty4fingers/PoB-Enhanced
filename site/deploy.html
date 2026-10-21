@@ -194,17 +194,86 @@ uv run --directory python pob2-web       <span class="c"># http://127.0.0.1:8080
         change.</p></div>
 
       <h2 id="mcp">Connect an AI agent (MCP)</h2>
-      <p>The MCP endpoint is <code>/mcp</code> on the same port. For Claude Code:</p>
-      <pre><code>claude mcp add --transport http pob2 http://localhost:8080/mcp</code></pre>
-      <p>From another machine use its address, for example <code>http://192.168.1.20:8080/mcp</code>, and make sure that
-        name or IP is in <code>POB2_ALLOWED_HOSTS</code>. The agent and the web UI share one live build, and the UI
-        refreshes as the agent works.</p>
-      <p>For Claude Desktop or a stdio-only client, run the server over stdio:</p>
-      <pre><code>{
+      <p>The MCP endpoint is <code>http://localhost:8080/mcp</code> (Streamable HTTP). The app's <strong>AI / MCP</strong>
+        tab shows these settings filled in with your server's address. Agents share the live build with the web UI, the UI
+        refreshes as they work, and anything they change can be undone.</p>
+
+      <h3>On your computer</h3>
+      <p>These run where you are, so they reach the server directly. From another machine, use the server's address (for
+        example <code>http://192.168.1.20:8080/mcp</code>) and add that name or IP to <code>POB2_ALLOWED_HOSTS</code>.</p>
+      <details open><summary>Claude Code</summary><div>
+        <pre><code>claude mcp add --transport http pob2 http://localhost:8080/mcp</code></pre></div></details>
+      <details><summary>Claude Desktop</summary><div>
+        <p>The config file starts local programs, so bridge with <code>mcp-remote</code> (needs Node.js). Settings →
+          Developer → Edit Config, then restart Claude. For a non-localhost <code>http://</code> address add
+          <code>"--allow-http"</code> to the args.</p>
+        <pre><code>{
   "mcpServers": {
-    "pob2": { "command": "docker", "args": ["run", "--rm", "-i", "ghcr.io/skitty4fingers/pob-enhanced:latest", "pob2-mcp"] }
+    "pob2": { "command": "npx", "args": ["-y", "mcp-remote", "http://localhost:8080/mcp"] }
   }
-}</code></pre>
+}</code></pre></div></details>
+      <details><summary>ChatGPT users: Codex CLI</summary><div>
+        <p>OpenAI's agent for the terminal and IDE, signed in with your ChatGPT account.</p>
+        <pre><code>codex mcp add pob2 --url http://localhost:8080/mcp</code></pre>
+        <p>or in <code>~/.codex/config.toml</code>:</p>
+        <pre><code>[mcp_servers.pob2]
+url = "http://localhost:8080/mcp"</code></pre></div></details>
+      <details><summary>Gemini users: Antigravity or Gemini CLI</summary><div>
+        <p>Personal Google AI accounts moved from Gemini CLI to <strong>Antigravity</strong> in June 2026. Add the server
+          in <code>~/.gemini/config/mcp_config.json</code> (or type <code>/mcp</code> in the CLI); remote servers use
+          <code>serverUrl</code>:</p>
+        <pre><code>{ "mcpServers": { "pob2": { "serverUrl": "http://localhost:8080/mcp" } } }</code></pre>
+        <p>Gemini CLI (API key or Code Assist for teams):</p>
+        <pre><code>gemini mcp add --transport http --scope user pob2 http://localhost:8080/mcp</code></pre></div></details>
+      <details><summary>Cursor, VS Code, Cline, Zed and other MCP clients</summary><div>
+        <pre><code>{ "mcpServers": { "pob2": { "url": "http://localhost:8080/mcp" } } }</code></pre>
+        <p>A stdio-only client can run its own copy instead (it does not share the web UI's build):</p>
+        <pre><code>{ "mcpServers": { "pob2": { "command": "docker", "args": ["run", "--rm", "-i", "ghcr.io/skitty4fingers/pob-enhanced:latest", "pob2-mcp"] } } }</code></pre></div></details>
+
+      <h3>Self-hosted models</h3>
+      <p>Run a local model and let it drive PoB-Enhanced. Pick a model with tool calling (Qwen 3, Llama 3.1 or newer,
+        Mistral Small...). Clients running in Docker reach the server at <code>host.docker.internal</code> (on Linux start
+        them with <code>--add-host=host.docker.internal:host-gateway</code>); add <code>host.docker.internal</code> to
+        <code>POB2_ALLOWED_HOSTS</code>.</p>
+      <details><summary>LM Studio (0.3.17 or newer)</summary><div>
+        <p>Right sidebar → Program → Install → Edit mcp.json:</p>
+        <pre><code>{ "mcpServers": { "pob2": { "url": "http://localhost:8080/mcp" } } }</code></pre></div></details>
+      <details><summary>Open WebUI with Ollama (0.6.31 or newer)</summary><div>
+        <ol class="steps">
+          <li>As an admin: <strong>Admin Settings → External Tools</strong> (Integrations in some versions) → <strong>+</strong>.</li>
+          <li>Type <strong>MCP (Streamable HTTP)</strong> (not OpenAPI), authentication <strong>None</strong>, URL
+            <code>http://host.docker.internal:8080/mcp</code>.</li>
+          <li>In a chat, enable the pob2 tools from the tools menu.</li>
+        </ol></div></details>
+      <details><summary>LibreChat</summary><div>
+        <pre><code>mcpServers:
+  pob2:
+    type: streamable-http
+    url: http://host.docker.internal:8080/mcp</code></pre></div></details>
+
+      <h3>Cloud chat apps: ChatGPT, Grok, Gemini, Muse, Claude.ai</h3>
+      <p>These connect from the provider's servers, so they need a <strong>public HTTPS address</strong> (they reject
+        localhost and private addresses). A tunnel is the quickest way:</p>
+      <pre><code>cloudflared tunnel --url http://localhost:8080      <span class="c"># Cloudflare quick tunnel, no account needed</span>
+ngrok http 8080                                    <span class="c"># or ngrok</span></code></pre>
+      <p>Add the hostname it prints (for example <code>word-word.trycloudflare.com</code>) to
+        <code>POB2_ALLOWED_HOSTS</code> and restart, then use <code>https://&lt;that-host&gt;/mcp</code>:</p>
+      <div class="table-wrap"><table>
+        <tr><th>App</th><th>Setup</th></tr>
+        <tr><td>ChatGPT</td><td>Settings → Apps &amp; Connectors → Advanced settings → <strong>Developer mode</strong>,
+          then Settings → Connectors → <strong>Create</strong>: URL, authentication <em>No authentication</em>. Use it from
+          a chat's <strong>+</strong> menu. Which plans allow custom connectors varies; check OpenAI's help pages.</td></tr>
+        <tr><td>Grok</td><td><code>grok.com/connectors</code> → <strong>New Connector</strong> → <strong>Custom</strong>
+          (paid plans). Through the xAI API, pass <code>{"type": "mcp", "server_label": "pob2", "server_url": "https://…/mcp"}</code> as a tool.</td></tr>
+        <tr><td>Gemini app</td><td>Connected Apps → add custom, where your plan offers it (it rolled out with Gemini
+          Spark on Google AI Ultra). Otherwise use Antigravity above.</td></tr>
+        <tr><td>Meta Muse</td><td>No MCP menu yet. Ask Muse to connect to the MCP server at your URL itself (it can save
+          that as a skill), or add a Custom Connector for the REST API from <code>https://…/openapi.json</code>.</td></tr>
+        <tr><td>Claude.ai</td><td>Settings → Connectors → <strong>Add custom connector</strong>.</td></tr>
+      </table></div>
+      <div class="note warn"><p><strong>There is no login.</strong> While the tunnel runs, anyone who learns its address
+        can view and change the loaded build (Undo brings it back; nothing else on your machine is exposed). Keep the
+        address private and stop the tunnel when you are done.</p></div>
 
       <h2 id="update">Updating</h2>
       <div class="table-wrap"><table>

@@ -130,6 +130,8 @@ or with Docker: `"command": "docker", "args": ["run", "--rm", "-i", "pob2-enhanc
 
 `pob2-mcp --http --port 8765` serves streamable HTTP without the web UI.
 
+Setup for ChatGPT (Codex CLI and the ChatGPT app), Gemini (Antigravity, Gemini CLI, the Gemini app), Grok, Meta Muse, Claude Desktop/Claude.ai and self-hosted models (LM Studio, Open WebUI with Ollama, LibreChat) is in the README's [Connect an AI agent](../README.md#connect-an-ai-agent) section and the web UI's **AI / MCP** tab. Cloud chat apps need a public HTTPS address (a tunnel) whose hostname is in `POB2_ALLOWED_HOSTS`.
+
 ### Tools
 
 | Area | Tools |
