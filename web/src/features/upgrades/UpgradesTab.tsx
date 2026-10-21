@@ -254,7 +254,7 @@ function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: b
               <div className="text-xs text-ink-400">{u.variant ? <span className="text-gold-soft">pick: {u.variant}</span> : u.baseName}{u.levelRequirement ? ` · lvl ${u.levelRequirement}` : ""}{showSlot ? ` · ${u.slot.replace(/^Jewel \d+$/, "jewel")}` : ""}</div>
             </td>
             <td className="pr-2 text-xs"><GainText g={u} /></td>
-            <td className="pr-2 text-right tabular-nums">
+            <td className="whitespace-nowrap pr-2 text-right tabular-nums">
               {u.price ? <><div className="text-ink-200">{u.price}</div><div className="text-xs text-ink-400">{u.listings} listed</div></> : <span className="text-xs text-ink-400">no price</span>}
             </td>
             <td className="whitespace-nowrap text-right">
