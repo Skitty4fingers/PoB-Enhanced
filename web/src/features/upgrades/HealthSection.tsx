@@ -10,7 +10,10 @@ const STYLE: Record<Finding["severity"], { icon: ReactNode; text: string; border
   low: { icon: <Info size={16} />, text: "text-ink-400", border: "border-l-ink-600", label: "Minor" },
 };
 
-const TAB_LABEL: Record<string, string> = { tree: "Tree", upgrades: "Upgrades", skills: "Skills", items: "Items", config: "Config" };
+const TAB_LABEL: Record<string, string> = {
+  tree: "Tree", upgrades: "Upgrades", skills: "Skills", items: "Items", config: "Config",
+  "upgrades/gear": "Gear", "upgrades/jewels": "Jewels", "upgrades/gems": "Gems", "upgrades/shop": "Shop",
+};
 
 /** One line for the summary card: "All clear" or counts per severity, linking to the full list. */
 export function healthSummary(check?: BuildCheck): { text: string; tone: string } | null {

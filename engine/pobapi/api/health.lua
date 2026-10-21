@@ -1,4 +1,4 @@
--- health.*: build health check. What is wrong with the build, worst first, each with a fix and the tab that has it.
+-- health.*: build health check. What is wrong with the build, worst first, each with a fix and the tab (or "upgrades/<section>") that has it.
 -- Every number comes from PoB's own outputs for the current Config tab; nothing here changes the build.
 local util = require("pobapi.util")
 local session = require("pobapi.session")
@@ -43,13 +43,13 @@ function M.check()
 			add(res < cap - 25 and "high" or "medium", "resistances",
 				("%s resistance is %d%% (cap %d%%)"):format(elem, res, cap),
 				("Find %d%% %s resistance on gear (rings, belt and boots are the cheapest slots)"):format(cap - res, elem:lower()),
-				"upgrades")
+				"upgrades/gear")
 		end
 	end
 	local chaos = out.ChaosResist or 0
 	if chaos < 0 then
 		add("medium", "resistances", ("Chaos resistance is %d%%"):format(chaos),
-			"Get chaos resistance to at least 0% (rings, amulet, and Soul Core of Tacati in a socket)", "upgrades")
+			"Get chaos resistance to at least 0% (rings, amulet, and Soul Core of Tacati in a socket)", "upgrades/gear")
 	end
 
 	-- Passive and ascendancy points.
@@ -99,7 +99,7 @@ function M.check()
 		if supports < wanted then
 			add(supports + 1 < wanted and "high" or "medium", "supports",
 				("Main skill %s has %d support%s"):format(active or "?", supports, supports == 1 and "" or "s"),
-				"Add supports: Upgrades → Gems ranks the best ones for this skill", "upgrades")
+				"Add supports: Upgrades → Gems ranks the best ones for this skill", "upgrades/gems")
 		end
 		if (out.TotalDPS or 0) <= 0 and (out.CombinedDPS or 0) <= 0 and (out.FullDPS or 0) <= 0 then
 			add("medium", "skills", ("Main skill %s shows no damage"):format(active or "?"),
@@ -124,7 +124,7 @@ function M.check()
 			"Drop a reservation or add Spirit (body armour, sceptre)", "skills")
 	elseif summary.totems and summary.spiritLimited then
 		add("medium", "spirit", ("%d of %d totems: Spirit limits them"):format(summary.totems, summary.totemCap or 0),
-			("%d more Spirit for the next totem"):format(math.max(0, (summary.totemCost or 0) - math.max(0, summary.free or 0))), "upgrades")
+			("%d more Spirit for the next totem"):format(math.max(0, (summary.totemCost or 0) - math.max(0, summary.free or 0))), "upgrades/gear")
 	elseif (summary.spirit or 0) >= 30 and (summary.free or 0) >= 30 then
 		add("low", "spirit", ("%d Spirit unused"):format(summary.free),
 			"Spend it on a persistent buff or aura (30+ Spirit fits most)", "skills")
@@ -132,7 +132,7 @@ function M.check()
 	for _, r in ipairs(summary.resources or { }) do
 		if r.costPerSecond and r.regen and r.costPerSecond > r.regen * 1.05 and r.key == "Mana" then
 			add("medium", "sustain", ("The main skill spends %.0f mana/s but you regenerate %.0f/s"):format(r.costPerSecond, r.regen),
-				"Add mana regeneration, leech or cost reduction (Efficiency, Inspiration) or a mana flask", "upgrades")
+				"Add mana regeneration, leech or cost reduction (Efficiency, Inspiration) or a mana flask", "upgrades/gems")
 		end
 	end
 
@@ -140,25 +140,25 @@ function M.check()
 	local pool = (out.Life or 0) + (out.EnergyShield or 0)
 	if level >= 20 and pool < level * 20 then
 		add("high", "survivability", ("Life %d and energy shield %d at level %d"):format(out.Life or 0, out.EnergyShield or 0, level),
-			"Add maximum life or energy shield on every armour slot", "upgrades")
+			"Add maximum life or energy shield on every armour slot", "upgrades/gear")
 	end
 	if level >= 20 and (out.MovementSpeedMod or 1) <= 1.0 then
 		add("medium", "movement", "No increased movement speed",
-			"Get movement speed on boots (it is the most valuable boot mod)", "upgrades")
+			"Get movement speed on boots (it is the most valuable boot mod)", "upgrades/gear")
 	end
 
 	-- Gear, charms and flasks.
 	for _, slotName in ipairs(GEAR) do
 		if not equipped(b, slotName) then
 			add(slotName:match("Ring") and "medium" or "high", "gear", ("Nothing in %s"):format(slotName),
-				"Equip something: Upgrades → Shop ranks the uniques that fit", "upgrades")
+				"Equip something: Upgrades → Shop ranks the uniques that fit", "upgrades/shop")
 		end
 	end
 	local main = equipped(b, "Weapon 1")
 	if main and main.base and main.base.tags and not main.base.tags.twohand and not equipped(b, "Weapon 2")
 		and not (main.base.type == "Bow" or main.base.type == "Crossbow") then
 		add("medium", "gear", ("Off-hand is empty next to a one-handed %s"):format(main.base.type or "weapon"),
-			"A shield, focus or quiver adds defence or damage for free (Upgrades → Shop)", "upgrades")
+			"A shield, focus or quiver adds defence or damage for free (Upgrades → Shop)", "upgrades/shop")
 	end
 	local flasks = 0
 	for i = 1, 2 do
@@ -184,7 +184,7 @@ function M.check()
 	end
 	if emptySockets > 0 then
 		add("medium", "jewels", ("%d allocated jewel socket%s without a jewel"):format(emptySockets, emptySockets == 1 and "" or "s"),
-			"Socket a jewel (Upgrades → Jewels) or refund the socket's point", "upgrades")
+			"Socket a jewel (Upgrades → Jewels) or refund the socket's point", "upgrades/jewels")
 	end
 
 	table.sort(findings, function(x, y)

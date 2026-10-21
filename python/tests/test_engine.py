@@ -76,6 +76,10 @@ def test_build_check(witch):
     assert check["findings"][0]["severity"] == "high" and check["counts"]["high"] >= 3
     unspent = next(f for f in check["findings"] if f["area"] == "passive points")
     assert unspent["tab"] == "tree" and "unspent" in unspent["message"]
+    # Upgrades findings name their section: a bare "upgrades" link does nothing from Build check.
+    assert all(f["tab"] != "upgrades" for f in check["findings"])
+    resist = next(f for f in check["findings"] if f["area"] == "resistances")
+    assert resist["tab"] == "upgrades/gear"
 
 
 def test_undo_redo_and_checkpoints(service):
