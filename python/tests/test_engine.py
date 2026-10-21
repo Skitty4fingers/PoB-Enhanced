@@ -27,6 +27,105 @@ def witch(service):
     return service
 
 
+def test_engine_loads_upstream_fixes(service):
+    patched = service.call("worker.ping")["patched"]
+    assert {"Modules/CalcOffence.lua", "Classes/CalcsTab.lua", "Classes/TradeQuery.lua"} <= set(patched)
+
+
+def test_unique_jewels_without_sockets(witch):
+    # A full search tries every unique jewel and variant (about a minute); a build without sockets returns at once.
+    assert witch.unique_jewels()["sockets"] == []
+
+
+def test_design_rare_keeps_the_base_and_helps(witch):
+    witch.call("items.equip", text=WAND)
+    design = witch.design_rare("Weapon 1")
+    assert design["base"] == "Attuned Wand" and design["replaces"] == "Test Wand, Attuned Wand"
+    assert 1 <= len(design["mods"]) <= 6 and design["gain"]["dpsPercent"] > 0
+    assert sum(m["type"] == "Prefix" for m in design["mods"]) <= 3
+    assert design["text"].startswith("Rarity: RARE") and "Attuned Wand" in design["text"]
+    assert witch.check_item(design["text"], "Weapon 1")["verdict"] == "upgrade"
+
+
+def test_compare_with_another_build(witch):
+    witch.call("items.equip", text=WAND)
+    other = witch.export()["code"]  # same build plus a few changes, below
+    witch.call("build.set_level", level=60)
+    witch.call("skills.add", gems=["Frostbolt"], makeMain=False)
+    witch.call("items.unequip", slot="Weapon 1")
+    before = witch.info()
+    data = witch.set_compare(other)
+    assert witch.info() == before  # the live build is untouched
+    assert data["mine"]["level"] == 60 and data["theirs"]["level"] == 90
+    dps = next(s for s in data["stats"] if s["key"] == "DPS")
+    assert dps["theirsBetter"] is True  # they hold the wand
+    weapon = next(r for r in data["items"] if r["slot"] == "Weapon 1")
+    assert weapon["mine"] is None and weapon["theirs"] == "Test Wand, Attuned Wand"
+    assert any(s["skill"] == "Frostbolt" and s["inMine"] and not s["inTheirs"] for s in data["skills"])
+    witch.copy_from_compare("item", "Weapon 1")
+    assert witch.call("items.list")[0]["item"]["name"] == "Test Wand, Attuned Wand"
+    witch.clear_compare()
+    assert witch.compare() is None
+
+
+def test_build_check(witch):
+    check = witch.build_check()
+    areas = {f["area"] for f in check["findings"]}
+    # A fresh level 90 witch: points unspent, resistances negative, gear empty.
+    assert {"passive points", "resistances", "gear"} <= areas
+    assert check["findings"][0]["severity"] == "high" and check["counts"]["high"] >= 3
+    unspent = next(f for f in check["findings"] if f["area"] == "passive points")
+    assert unspent["tab"] == "tree" and "unspent" in unspent["message"]
+
+
+def test_undo_redo_and_checkpoints(service):
+    service.new_build("Witch", "Infernalist", 90)
+    service.call("skills.add", gems=["Fireball"])
+    level = service.info()["level"]
+    service.call("build.set_level", level=40)
+    assert service.history()["undo"][0]["label"] == "Change level"
+    service.undo()
+    assert service.info()["level"] == level and service.history()["redo"][0]["label"] == "Change level"
+    service.redo()
+    assert service.info()["level"] == 40
+    # A checkpoint, two changes, then straight back to the checkpoint.
+    cp = service.checkpoint("before experiments")["undo"][0]
+    service.call("build.set_level", level=10)
+    service.call("skills.remove", group=1)
+    service.restore_history(cp["id"])
+    assert service.info()["level"] == 40 and service.info()["mainSkill"] == "Fireball"
+    # A compound operation (new build = new + class + level) is one undo step.
+    service.new_build("Ranger", "Deadeye", 50)
+    service.undo()
+    assert service.info()["className"] == "Witch"
+
+
+def test_saved_builds_and_restart(service, tmp_path):
+    from pob2.service import PoBService
+    from pob2.store import BuildStore
+
+    store = BuildStore(tmp_path)
+    svc = PoBService(service.engine, store=store)
+    svc.new_build("Witch", "Infernalist", 77)
+    saved = svc.save_build("My witch")
+    assert saved["level"] == 77 and [b["name"] for b in svc.saved_builds()] == ["My witch"]
+    assert svc.save_build("My witch")["id"] == saved["id"]  # same name overwrites
+    svc.new_build("Ranger", None, 5)
+    svc.open_saved_build(saved["id"])
+    assert svc.info()["level"] == 77
+    svc.save_now()
+    # The old process makes one more change but dies before saving it...
+    svc._save_timer.cancel()
+    svc.store = None
+    svc.call("build.set_level", level=5)
+    # ...and a new one (same data folder) comes back with the last saved build.
+    restarted = PoBService(service.engine, store=store)
+    assert restarted.restore_saved_state() and restarted.info()["level"] == 77
+    restarted.delete_saved_build(saved["id"])
+    svc = restarted
+    assert svc.saved_builds() == []
+
+
 def test_new_build(witch):
     info = witch.info()
     assert info["className"] == "Witch"

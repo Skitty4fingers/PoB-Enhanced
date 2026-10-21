@@ -1,11 +1,13 @@
-import { BookOpen, Bot, CircleHelp, Gem, Network, Settings2, Shield, TrendingUp } from "lucide-react";
+import { ArrowLeftRight, BookOpen, Bot, CircleHelp, Gem, Network, Settings2, Shield, TrendingUp } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLiveRevision, useOverview } from "./api/hooks";
 import { ErrorText } from "./components/ErrorText";
 import { Header } from "./components/Header";
 import { BudgetCard } from "./components/BudgetCard";
+import { CommandPalette } from "./components/CommandPalette";
 import { StatPanel } from "./components/StatPanel";
 import { AiTab } from "./features/ai/AiTab";
+import { CompareTab } from "./features/compare/CompareTab";
 import { ConfigTab } from "./features/config/ConfigTab";
 import { ItemsTab } from "./features/items/ItemsTab";
 import { ReferenceTab } from "./features/reference/ReferenceTab";
@@ -21,12 +23,13 @@ const TABS: { id: string; label: string; icon: ReactNode }[] = [
   { id: "config", label: "Config", icon: <Settings2 size={15} /> },
   { id: "upgrades", label: "Upgrades", icon: <TrendingUp size={15} /> },
   { id: "reference", label: "Guide", icon: <BookOpen size={15} /> },
+  { id: "compare", label: "Compare", icon: <ArrowLeftRight size={15} /> },
   { id: "ai", label: "AI / MCP", icon: <Bot size={15} /> },
   { id: "help", label: "Help", icon: <CircleHelp size={15} /> },
 ];
 
 function initialTab() {
-  const hash = window.location.hash.slice(1);
+  const hash = window.location.hash.slice(1).split("/")[0];
   return TABS.some((t) => t.id === hash) ? hash : "tree";
 }
 
@@ -48,6 +51,7 @@ export default function App() {
     <div className="flex h-full flex-col">
       <Header info={overview.data?.info} revision={revision} />
       <WelcomeBanner />
+      <CommandPalette />
       {overview.error ? <div className="p-4"><ErrorText error={overview.error} /></div> : null}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <aside className="order-2 max-h-[40vh] overflow-y-auto border-t border-ink-700 bg-ink-900 md:order-1 md:max-h-none md:w-72 md:shrink-0 md:border-t-0 md:border-r">
@@ -75,6 +79,7 @@ export default function App() {
             {tab === "config" && <ConfigTab />}
             {tab === "upgrades" && <UpgradesTab />}
             {tab === "reference" && <ReferenceTab />}
+            {tab === "compare" && <CompareTab />}
             {tab === "ai" && <AiTab />}
             {tab === "help" && <HelpTab />}
           </div>

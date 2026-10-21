@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { CircleHelp, Download, FilePlus2, Radio, RefreshCw, Upload } from "lucide-react";
-import { useState } from "react";
+import { CircleHelp, Download, FilePlus2, Radio, RefreshCw, Search, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useBuildMutation } from "../api/hooks";
 import type { BuildInfo, SourceInfo } from "../api/types";
 import { ExportDialog, ImportDialog, NewBuildDialog } from "./BuildDialogs";
+import { BuildsButton, HistoryControls } from "./HistoryControls";
 import { LevelEditor } from "./LevelEditor";
 
 type Dialog = "import" | "export" | "new" | null;
@@ -46,6 +47,15 @@ function UpdateButton() {
 export function Header({ info, revision }: { info?: BuildInfo; revision?: number }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const close = () => setDialog(null);
+  // The command palette (Ctrl+K) opens these dialogs.
+  useEffect(() => {
+    const onCommand = (e: Event) => {
+      const name = (e as CustomEvent<string>).detail;
+      if (name === "import" || name === "new" || name === "export") setDialog(name);
+    };
+    window.addEventListener("pob:command", onCommand);
+    return () => window.removeEventListener("pob:command", onCommand);
+  }, []);
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-ink-700 bg-ink-900 px-4 py-2.5">
       <div className="flex items-center gap-2">
@@ -68,7 +78,12 @@ export function Header({ info, revision }: { info?: BuildInfo; revision?: number
         <span className="hidden items-center gap-1 text-xs text-ink-400 sm:flex" title="The UI refreshes when the build changes (including changes made by an AI agent over MCP)">
           <Radio size={12} className="text-good" /> live · rev {revision ?? "–"}
         </span>
+        <button className="btn btn-ghost hidden text-xs text-ink-400 md:inline-flex" onClick={() => window.dispatchEvent(new Event("pob:palette"))} title="Search everything (Ctrl+K)">
+          <Search size={14} /><span className="hidden xl:inline">Search</span> <kbd className="rounded border border-ink-600 px-1 text-[10px]">Ctrl K</kbd>
+        </button>
+        <HistoryControls />
         <UpdateButton />
+        <BuildsButton />
         <button className="btn" onClick={() => setDialog("new")}><FilePlus2 size={14} /> New</button>
         <button className="btn" onClick={() => setDialog("import")}><Upload size={14} /> Import</button>
         <button className="btn btn-primary" onClick={() => setDialog("export")}><Download size={14} /> Export</button>

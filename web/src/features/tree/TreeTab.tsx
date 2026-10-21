@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Crosshair, Link2, RotateCcw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, qs } from "../../api/client";
+import { pendingFocus } from "../../components/CommandPalette";
 import { useAdvice, useBuildMutation, useReference, useReferenceCompare, useTreeLayout } from "../../api/hooks";
 import type { Advice, Comparison, LayoutNode, SocketedJewel, TreeNodeInfo } from "../../api/types";
 import { DeltaTable } from "../../components/DeltaTable";
@@ -272,6 +273,18 @@ export function TreeTab() {
     viewRef.current = { scale, x: sx - n.x * scale, y: sy - n.y * scale };
     force((x) => x + 1);
   };
+  // The command palette (Ctrl+K) asks to centre on a node, possibly before the tree has loaded.
+  useEffect(() => {
+    const focus = () => {
+      if (pendingFocus.id !== null && layout.data) {
+        centerOn(pendingFocus.id);
+        pendingFocus.id = null;
+      }
+    };
+    focus();
+    window.addEventListener("pob:focus-node", focus);
+    return () => window.removeEventListener("pob:focus-node", focus);
+  });
 
   return (
     <div className="flex h-full min-h-[480px] flex-col">

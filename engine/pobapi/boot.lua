@@ -1,6 +1,40 @@
 -- Boots Path of Building headless. Mirrors src/HeadlessWrapper.lua without blocking on stdin.
 local M = {}
 
+-- Upstream fixes (patches/, applied by pob2.patches into ../.patched/): load the patched copy of a file instead of
+-- src/'s, but only while src/'s file is still the one the patch was applied to. After an upstream update the copy
+-- is stale and src/'s file wins.
+M.patched = { }
+function M.usePatchedFiles()
+	local f = io.open("../.patched/manifest.json", "rb")
+	if not f then
+		return
+	end
+	local ok, manifest = pcall(function() return require("dkjson").decode(f:read("*a")) end)
+	f:close()
+	if not ok or type(manifest) ~= "table" or type(manifest.files) ~= "table" then
+		return
+	end
+	local sha1 = require("sha1")
+	local overlay = { }
+	for rel, info in pairs(manifest.files) do
+		local src = io.open(rel, "rb")
+		local original = src and src:read("*a")
+		if src then src:close() end
+		if original and sha1.sha1(original) == info.original then
+			overlay[rel] = "../" .. info.path
+			M.patched[#M.patched + 1] = rel
+		else
+			io.stderr:write("pobapi: ignoring stale patched copy of " .. rel .. " (src/ changed)\n")
+		end
+	end
+	local l_loadfile = loadfile
+	function loadfile(name, ...)
+		local path = name and overlay[name:gsub("\\", "/"):gsub("^%./", "")]
+		return l_loadfile(path or name, ...)
+	end
+end
+
 function M.start()
 	dofile("_SimpleGraphic.def.lua")
 
@@ -26,6 +60,7 @@ function M.start()
 		return l_require(name)
 	end
 
+	M.usePatchedFiles()
 	dofile("Launch.lua")
 	__mainObject__.continuousIntegrationMode = os.getenv("CI")
 	runCallback("OnInit")

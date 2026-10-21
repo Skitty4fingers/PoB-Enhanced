@@ -367,6 +367,142 @@ function M.uniques(params)
 	return res
 end
 
+-- Unique jewels per allocated jewel socket, every current variant tried ("which skill", "which god", ring size...),
+-- measured in place so radius jewels see the nodes around that socket. Outdated "Pre x.y" variants are skipped,
+-- skill-choice jewels (Prism of Belief) only try the skills this build uses, and multi-pick jewels (Megalomaniac)
+-- fill their picks greedily, best single pick first. Each jewel's best variant is found in one socket; other
+-- sockets re-measure that variant, except radius jewels, which try every variant in every socket.
+local function variantCopy(item, v, alts)
+	local copy = new("Item"):Item(item:BuildRaw())
+	copy.variant = v
+	copy.variantAlt, copy.variantAlt2 = alts and alts[1], alts and alts[2]
+	copy:BuildAndParseRaw()
+	copy:BuildModList()
+	return copy
+end
+
+function M.jewels(params)
+	params = params or { }
+	local b = session.build()
+	local metric = metricOf(params)
+	local limit = tonumber(params.limit) or 5
+	local calcFunc, _, measure = measurer(b, metric)
+	local sockets = { }
+	for _, slot in ipairs(b.itemsTab.orderedSlots) do
+		if slot.nodeId and b.spec.allocNodes[slot.nodeId] and (not params.slot or params.slot == slot.slotName) then
+			sockets[#sockets + 1] = slot
+		end
+	end
+	if #sockets == 0 then
+		return { metric = metric, sockets = util.array() }
+	end
+	local skillNames = { }
+	for _, group in ipairs(b.skillsTab.socketGroupList) do
+		for _, gem in ipairs(group.gemList or { }) do
+			if gem.gemData then skillNames[gem.gemData.name] = true end
+		end
+	end
+	local function score(slot, item)
+		local ok, r = pcall(function() return measure(calcFunc({ repSlotName = slot.slotName, repItem = item })) end)
+		return ok and r or nil
+	end
+
+	-- Candidate variants per jewel.
+	local jewels = { }
+	for name, item in pairs(main.uniqueDB.list) do
+		if item.type == "Jewel" and item.base then
+			local variants = { }
+			for i, label in ipairs(item.variantList or { }) do
+				if not tostring(label):match("^Pre %d") then
+					variants[#variants + 1] = i
+				end
+			end
+			if #variants > 30 then
+				local own = { }
+				for _, i in ipairs(variants) do
+					if skillNames[item.variantList[i]] then own[#own + 1] = i end
+				end
+				if #own > 0 then variants = own end
+			end
+			jewels[#jewels + 1] = { item = item, name = item.title or name, variants = variants,
+				radius = item.jewelRadiusIndex ~= nil or item.jewelRadiusLabel ~= nil, multi = item.hasAltVariant and 1 + (item.hasAltVariant2 and 1 or 0) or 0 }
+		end
+	end
+
+	-- Best variant of each jewel, found in the first socket.
+	local ref = sockets[1]
+	for _, j in ipairs(jewels) do
+		if b.itemsTab:IsItemValidForSlot(j.item, ref.slotName) then
+			if #j.variants == 0 then
+				j.best = { item = j.item }
+			else
+				local singles = { }
+				for _, v in ipairs(j.variants) do
+					local copy = variantCopy(j.item, v, j.multi > 0 and { v, v } or nil)
+					local r = score(ref, copy)
+					if r then singles[#singles + 1] = { v = v, r = r, item = copy } end
+				end
+				table.sort(singles, function(x, y) return x.r.score > y.r.score end)
+				if singles[1] then
+					j.best = singles[1]
+					if j.multi > 0 then
+						-- Fill the extra picks from the best singles, keeping a pick only if it adds something.
+						local picks = { singles[1].v }
+						for k = 2, math.min(#singles, 12) do
+							if #picks > j.multi then break end
+							local alts = { picks[2] or singles[k].v, picks[3] or singles[k].v }
+							if #picks == 1 then alts = { singles[k].v, singles[k].v } else alts = { picks[2], singles[k].v } end
+							local copy = variantCopy(j.item, picks[1], alts)
+							local r = score(ref, copy)
+							if r and r.score > j.best.r.score + DEAD then
+								picks[#picks + 1] = singles[k].v
+								j.best = { v = picks[1], alts = { picks[2], picks[3] or picks[2] }, r = r, item = copy }
+							end
+						end
+						j.picks = picks
+					end
+				end
+			end
+		end
+	end
+
+	local res = util.array()
+	for _, slot in ipairs(sockets) do
+		local current = b.itemsTab.items[slot.selItemId]
+		local rows = { }
+		for _, j in ipairs(jewels) do
+			if j.best and b.itemsTab:IsItemValidForSlot(j.item, slot.slotName) and not (current and current.title == j.name) then
+				local tries = (j.radius and #j.variants > 0 and j.multi == 0) and j.variants or { false }
+				local top
+				for _, v in ipairs(tries) do
+					local item = v and variantCopy(j.item, v) or j.best.item
+					local r = score(slot, item)
+					if r and (not top or r.score > top.r.score) then
+						top = { r = r, v = v or j.best.v }
+					end
+				end
+				if top and top.r.score >= DEAD then
+					local r = top.r
+					r.name = j.name
+					if j.picks and #j.picks > 0 then
+						local labels = { }
+						for _, v in ipairs(j.picks) do labels[#labels + 1] = j.item.variantList[v] end
+						r.variant = table.concat(labels, " + ")
+					elseif top.v then
+						r.variant = j.item.variantList[top.v]
+					end
+					rows[#rows + 1] = r
+				end
+			end
+		end
+		table.sort(rows, function(x, y) return x.score > y.score end)
+		local kept = util.array()
+		for i = 1, math.min(limit, #rows) do kept[i] = rows[i] end
+		res[#res + 1] = { slot = slot.slotName, nodeId = slot.nodeId, current = current and current.name or nil, suggestions = kept }
+	end
+	return { metric = metric, sockets = res }
+end
+
 M._metricOf = metricOf
 M._measurer = measurer
 

@@ -1,5 +1,6 @@
 import {
-  ArrowRight, BookOpen, Bot, CircleHelp, ClipboardCheck, Gauge, Gem, LifeBuoy, Network, Rocket, TrendingUp,
+  ArrowLeftRight, ArrowRight, BookOpen, Bot, CircleHelp, ClipboardCheck, Gauge, Gem, HeartPulse, History, LifeBuoy, Network, Rocket, Search,
+  TrendingUp,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -62,13 +63,14 @@ const SECTIONS: Section[] = [
         <p>PoB-Enhanced runs Path of Building&apos;s own calculator. Every number here is measured in <Term>your</Term> build, with your Config tab settings.</p>
         <Steps
           items={[
-            <>Press <Term>Import</Term> (top right) and paste a PoB share code, a pobb.in / pastebin link, or your <Term>poe.ninja character page</Term> (<Kbd>poe.ninja/poe2/profile/&lt;account&gt;/&lt;league&gt;/character/&lt;name&gt;</Kbd>).</>,
+            <>Press <Term>Import</Term> (top right) and paste a PoB share code, a link (pobb.in, pastebin, Maxroll, poe2db, Rentry), or your <Term>poe.ninja character page</Term> (<Kbd>poe.ninja/poe2/profile/&lt;account&gt;/&lt;league&gt;/character/&lt;name&gt;</Kbd>).</>,
             <>Check the <Term>summary card</Term> in the sidebar: DPS, EHP and your resources (Mana, Spirit, Rage, Runic Ward).</>,
             <>Set the <Term>Config</Term> tab to how you actually play (enemy conditions, buffs, charges). It changes every number.</>,
             <>Follow the <Term>Tree</Term> advisor for passive points, and use <Term>Upgrades</Term> before you spend currency.</>,
             <>When your character changes in game, press <Term>Update</Term> in the header to re-import it. Your Config settings are kept.</>,
           ]}
         />
+        <p className="mt-3">Press <Kbd>Ctrl</Kbd>+<Kbd>K</Kbd> anywhere to search tabs, commands, passives, items, skills, config options and stats.</p>
       </>
     ),
   },
@@ -89,6 +91,38 @@ const SECTIONS: Section[] = [
           ]}
         />
       </>
+    ),
+  },
+  {
+    id: "health",
+    title: "Build check",
+    icon: <HeartPulse size={15} />,
+    body: (
+      <>
+        <p>A list of what is wrong with the build, worst first, each with a fix and a button to the tab that has it. The summary card shows a one-line result; click it to open the list.</p>
+        <Points
+          items={[
+            <>Uncapped or negative resistances, unspent passive and ascendancy points, a main skill with few supports.</>,
+            <>Unmet attribute requirements, Spirit shortfalls or unused Spirit, a main skill that drains mana.</>,
+            <>Empty gear, off-hand, flask, charm and jewel slots, low life for your level, no movement speed.</>,
+          ]}
+        />
+        <Open tab="upgrades/health">Open Build check</Open>
+      </>
+    ),
+  },
+  {
+    id: "history",
+    title: "Undo, history and saved builds",
+    icon: <History size={15} />,
+    body: (
+      <Points
+        items={[
+          <><Term>Undo</Term> and <Term>Redo</Term> are in the header (<Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>, <Kbd>Ctrl</Kbd>+<Kbd>Y</Kbd>). They cover every change, including ones an AI agent makes.</>,
+          <><Term>History</Term> lists the changes; go back to any point, or add a named checkpoint before experimenting.</>,
+          <><Term>Builds</Term> saves named copies to the server's data folder. The current build is also kept automatically, so it comes back after a restart or update.</>,
+        ]}
+      />
     ),
   },
   {
@@ -121,7 +155,8 @@ const SECTIONS: Section[] = [
         <Points
           items={[
             <><Term>Check item</Term>: paste any item (Ctrl+C in game or from trade) for an upgrade / sidegrade / downgrade verdict. It checks every damage skill, totems, Spirit, attribute requirements and skills the swap would remove. <Term>Do this before buying anything.</Term></>,
-            <><Term>Gear</Term> and <Term>Jewels</Term>: what each item and mod is worth (dead mods flagged), what to look for on a replacement, and a weighted trade search.</>,
+            <><Term>Gear</Term>: what each item and mod is worth (dead mods flagged), what to look for on a replacement, and a weighted trade search. <Term>Design best rare</Term> builds the best rare for the slot from the real mod pool, measured in your build, with a trade search for it.</>,
+            <><Term>Jewels</Term>: the same for jewels, plus the best unique jewels for each socket with the variant to buy (for example Prism of Belief rolled for your main skill).</>,
             <><Term>Sockets</Term>: what each rune, soul core and idol is worth and the best legal replacements. It respects corruption, level, per-item limits and character-wide limits (for example Ancient Augment). <Term>Build plan</Term> gives an ordered list of swaps measured together.</>,
             <><Term>Gems</Term>: what each support is worth, the best swap for the weakest one, and level/quality upgrades. One click applies a suggestion.</>,
             <><Term>Shop</Term>: uniques that would help most, with poe.ninja prices and a budget filter.</>,
@@ -182,6 +217,31 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: "compare",
+    title: "Compare with another build",
+    icon: <ArrowLeftRight size={15} />,
+    body: (
+      <>
+        <p>Paste any build (a top ladder character's poe.ninja page, a guide's PoB link, an older version of yours) on the <Term>Compare</Term> tab.</p>
+        <Points
+          items={[
+            <>DPS, EHP and stats side by side, items per slot, skills and the supports only one of you uses, notables only one of you takes, and config differences.</>,
+            <><Term>Check</Term> any of their items in your build, or <Term>Copy</Term> it, their tree or their config across (undoable). Comparing never changes your build.</>,
+          ]}
+        />
+        <Open tab="compare">Open Compare</Open>
+      </>
+    ),
+  },
+  {
+    id: "search",
+    title: "Search (Ctrl+K)",
+    icon: <Search size={15} />,
+    body: (
+      <p>Press <Kbd>Ctrl</Kbd>+<Kbd>K</Kbd> (or the Search button in the header) and type: jump to a tab or Upgrades section, run a command (import, export, undo, saved builds), find a passive and centre the tree on it, or look up an equipped item, a gem, a config option or a stat&apos;s value.</p>
+    ),
+  },
+  {
     id: "ai",
     title: "AI agents (MCP)",
     icon: <Bot size={15} />,
@@ -201,10 +261,11 @@ const SECTIONS: Section[] = [
     body: (
       <Points
         items={[
-          <>There is <Term>one live build</Term> per server, shared by every browser tab and agent. It lives in memory: after a server restart, import again or press Update.</>,
+          <>There is <Term>one live build</Term> per server, shared by every browser tab and agent. It is saved to the server's data folder after every change and comes back after a restart (Docker: keep the <Kbd>/data</Kbd> volume).</>,
           <>There is <Term>no login</Term>. Anyone who can reach the server can change the build, so keep it on localhost, your home network or a tailnet.</>,
           <>Numbers follow PoB&apos;s calculator. Mods PoB doesn&apos;t support show as unmodelled, and the advisors treat them as worth 0.</>,
-          <>Nothing is changed by advice, checks or plans. Only Allocate, Apply, Equip and similar buttons change the build.</>,
+          <>Nothing is changed by advice, checks, plans or comparisons. Only Allocate, Apply, Equip, Copy and similar buttons change the build, and Undo reverses any of them.</>,
+          <>Upstream Path of Building bugs that affect the numbers (for example slam builds losing Fist of War) are fixed by small patches the engine applies at start-up.</>,
           <>Use your browser&apos;s back button or the tabs to move around; the URL keeps the current tab (<Kbd>#upgrades</Kbd>, <Kbd>#help</Kbd>).</>,
         ]}
       />

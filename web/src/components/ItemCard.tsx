@@ -1,5 +1,6 @@
 import type { Item } from "../api/types";
 import { rarityColor } from "./format";
+import { ItemArt } from "./ItemArt";
 
 const kindStyle: Record<string, string> = {
   enchant: "text-es",
@@ -12,6 +13,7 @@ export function ItemCard({ item }: { item: Item }) {
   const color = rarityColor[item.rarity] ?? "text-ink-200";
   return (
     <div className="text-center text-[13px]">
+      <div className="mb-1.5 flex justify-center"><ItemArt item={item} size={56} /></div>
       <div className={`font-semibold ${color}`}>{item.title ?? item.name}</div>
       {item.title && <div className={color}>{item.baseName}</div>}
       <div className="mt-0.5 text-xs text-ink-400">

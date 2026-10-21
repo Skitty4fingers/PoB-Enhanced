@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { api } from "./client";
-import type { Advice, Budget, ClassInfo, ConfigOption, Overview, ReferenceCompare, ReferenceSummary, SkillGroup, SlotItem, TreeLayout } from "./types";
+import type { Advice, Budget, BuildCheck, ClassInfo, ConfigOption, Overview, ReferenceCompare, ReferenceSummary, SkillGroup, SlotItem, TreeLayout } from "./types";
 
 /** Poll the server revision; when an agent (MCP) or another tab changes the build, refetch everything. */
 export function useLiveRevision() {
@@ -56,6 +56,9 @@ export const useReferenceCompare = (enabled: boolean, level: number | null = nul
 /** Next point / point to move / attribute advice for the live build (follows the reference guide if loaded). */
 export const useAdvice = (metric: Advice["metric"], enabled = true) =>
   useQuery({ queryKey: ["advice", metric], queryFn: () => api.get<Advice>(`/advisor?metric=${metric}`), enabled });
+
+/** Build health check: problems worst first. */
+export const useBuildCheck = () => useQuery({ queryKey: ["build-check"], queryFn: () => api.get<BuildCheck>("/check") });
 
 /** Spirit/totem budget and main-skill DPS across all totems. */
 export const useBudget = () => useQuery({ queryKey: ["budget"], queryFn: () => api.get<Budget>("/budget") });

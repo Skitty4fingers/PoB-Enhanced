@@ -91,6 +91,7 @@ Notes:
 | `POB2_ROOT` | auto-detected | Repository root (contains `src/Launch.lua` and `engine/`) |
 | `POB2_ALLOWED_HOSTS` | (none) | Extra hostnames accepted by `/mcp`, comma-separated (localhost is always allowed) |
 | `POB2_TREE_ART` | `<repo>/tree-art` | Passive tree artwork served at `/tree-art` (see below) |
+| `POB2_DATA` | `/data` (Docker), `~/.local/share/pob2`, `%LOCALAPPDATA%\pob2` | Current build (restored at start), saved builds, guide, item art |
 
 ### Passive tree artwork
 
@@ -141,8 +142,12 @@ or with Docker: `"command": "docker", "args": ["run", "--rm", "-i", "pob2-enhanc
 | Config | `list_config`, `set_config`, `set_custom_mods` |
 | Guide | `load_reference_build`, `compare_to_reference`, `reference_impact`, `apply_reference_tree` |
 | Advisor | `get_advice`, `set_attribute_nodes` |
-| Upgrades | `gear_advice`, `shopping_advice`, `gem_advice`, `socket_advice`, `set_gem`, `refresh_build` |
-| Budget | `check_item`, `get_budget` |
+| Upgrades | `gear_advice`, `shopping_advice`, `gem_advice`, `socket_advice`, `design_rare`, `suggest_unique_jewels`, `set_gem`, `refresh_build` |
+| Budget | `check_item`, `get_budget`, `build_check` |
+| History | `undo`, `redo`, `get_history`, `checkpoint`, `restore_history` |
+| Saved builds | `save_build`, `list_saved_builds`, `open_saved_build`, `delete_saved_build` |
+| Compare | `compare_with_build`, `copy_from_compared_build` |
+| Knowledge | `library` (PoE2 facts PoB doesn't carry, from PoB Redux) |
 
 Resources: `pob://build/code`, `pob://build/xml`. Prompts: `analyze_build`, `optimize_passives`, `optimize_to_reference`.
 
@@ -179,6 +184,13 @@ POST /api/skills/{group}/gems/{index}       {name?, level?, quality?, enabled?}
 GET  /api/build/source  POST /api/build/refresh   re-import from the source link, keeping config
 GET  /api/budget                            Spirit used/free, totems affordable vs cap, DPS across all totems
 POST /api/items/check   {text, slot?}       check before you buy: verdict, every skill, Spirit/totems, warnings
+GET  /api/check                             build health check: problems worst first, each with a fix
+GET  /api/history   POST /api/history/undo|redo|checkpoint   POST /api/history/{id}/restore
+GET|POST /api/builds   POST /api/builds/{id}/open   DELETE /api/builds/{id}   saved builds library
+GET|PUT|DELETE /api/compare {source}   POST /api/compare/copy {what, slot?}   compare with a second build
+GET  /api/designer?slot=&metric=&itemLevel=&league=  best rare for a slot from the mod pool, with a trade URL
+GET  /api/gear/jewels?metric=&slot=&league=  best unique jewels (and variant) per allocated socket
+GET  /api/art                               item icon URLs by unique name and base type
 GET  /api/revision              increments whenever the build changes
 ```
 
@@ -195,6 +207,34 @@ the guide. You get:
 
 Guides are staged by character level (`level_interval`); the comparison uses your build's level unless you pick a
 stage. The reference is kept in memory until replaced or the server restarts.
+
+## Persistence, history and saved builds
+
+The web server and MCP server keep their state in `POB2_DATA`: `current.json` (the live build, written a second
+after each change and restored at start-up), `reference.json` (the loaded guide), `builds/` (named saved builds) and
+`art.json` (item icons learned from poe.ninja). The Docker image declares `/data` as a volume; mount one to keep it
+across updates. The CLI and tests keep everything in memory.
+
+Every build-changing call, from the UI or an agent, first snapshots the build (PoB XML plus where it came from), so
+undo/redo and "go back to" work across everything; multi-step operations (import, new build, update) are one step.
+Forty steps are kept in memory.
+
+## Upstream fixes (patches/)
+
+`patches/poe2/*.patch` fix Path of Building bugs that change the numbers. `pob2.patches` applies them to copies of the
+affected files in `.patched/` before the engine starts (also at image build), records a hash of each original, and
+`engine/pobapi/boot.lua` loads a copy instead of `src/`'s file only while that hash still matches. `src/` is never
+modified, and a patch upstream has absorbed is skipped with a warning. `worker.ping` lists the patched files.
+
+## Compare, designer and jewels
+
+- **Compare** loads a second build inside one engine call (save yours, load theirs, read it, load yours back), so no
+  other request sees the swap. Copying their tree, config or an item goes through the normal (undoable) calls.
+- **Design best rare** keeps the slot's base, quality, sockets, runes and implicits, takes the top tier of each mod
+  family that can roll at the item level, and picks up to 3 prefixes and 3 suffixes greedily, each measured with
+  PoB's calculator. The trade search asks for all but one of the chosen stats.
+- **Unique jewels** tries every unique jewel and current variant per allocated socket. Skill-choice jewels only try
+  the build's own skills, multi-pick jewels fill their picks greedily, and radius jewels are re-tried per socket.
 
 ## Advisor
 

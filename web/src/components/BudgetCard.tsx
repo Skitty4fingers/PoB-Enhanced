@@ -1,7 +1,8 @@
 import { AlertTriangle, Loader2, Shield, Swords } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Budget, Resource } from "../api/types";
-import { useBudget } from "../api/hooks";
+import { useBudget, useBuildCheck } from "../api/hooks";
+import { healthSummary } from "../features/upgrades/HealthSection";
 import { fmtCompact, fmtNum } from "./format";
 
 const RESOURCE: Record<string, { bar: string; text: string }> = {
@@ -39,6 +40,8 @@ function useChanges(b?: Budget) {
  *  Refetched whenever the build changes (useLiveRevision invalidates every query). */
 export function BudgetCard() {
   const { data: b, isFetching } = useBudget();
+  const check = useBuildCheck();
+  const health = healthSummary(check.data);
   const chips = useChanges(b);
   if (!b) return <Skeleton />;
   const totems = b.totems !== undefined;
@@ -78,6 +81,12 @@ export function BudgetCard() {
         ))}
         {b.spirit > 0 && <SpiritRow b={b} />}
       </div>
+      {health && (
+        <button onClick={() => { window.location.hash = "upgrades/health"; }}
+          className={`mt-2.5 flex w-full items-center justify-between rounded border border-ink-700 px-2 py-1 text-left text-xs hover:border-gold ${health.tone}`}>
+          <span>{health.text}</span><span className="text-ink-400">→</span>
+        </button>
+      )}
       {totems && b.spiritLimited && (
         <p className="mt-2 flex gap-1 text-xs text-rare">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" />

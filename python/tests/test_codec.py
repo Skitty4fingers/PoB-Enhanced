@@ -32,6 +32,12 @@ def test_invalid_code():
         ("https://pobb.in/u/someone/abc123/", "https://pobb.in/abc123/raw"),
         ("https://pastebin.com/XyZ", "https://pastebin.com/raw/XyZ"),
         ("https://poe.ninja/poe2/pob/1a2b", "https://poe.ninja/poe2/pob/raw/1a2b"),
+        ("https://poe2.ninja/pob/1a2b", "https://poe.ninja/poe2/pob/raw/1a2b"),
+        ("https://maxroll.gg/poe2/pob/g312000h", "https://maxroll.gg/poe2/api/pob/g312000h"),
+        ("https://www.maxroll.gg/poe2/pob/g312000h/", "https://maxroll.gg/poe2/api/pob/g312000h"),
+        ("https://poe2db.tw/pob/abc", "https://poe2db.tw/pob/abc/raw"),
+        ("https://rentry.co/my-build", "https://rentry.co/paste/my-build/raw"),
+        ("https://maxroll.gg/poe/pob/abc", None),  # PoE1
         ("https://example.com/x", None),
     ],
 )

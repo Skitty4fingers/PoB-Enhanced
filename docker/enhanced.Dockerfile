@@ -27,9 +27,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY --from=luajit /opt/luajit /opt/luajit
 ENV PATH="/opt/luajit/bin:/app/python/.venv/bin:$PATH" \
     POB2_ROOT=/app \
+    POB2_DATA=/data \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
-RUN useradd --create-home pob
+RUN useradd --create-home pob && mkdir /data && chown pob /data
 WORKDIR /app
 COPY python/pyproject.toml python/uv.lock python/README.md python/
 RUN uv sync --directory python --frozen --no-dev --no-install-project
@@ -41,7 +42,13 @@ COPY engine/ engine/
 COPY python/ python/
 COPY --from=web /repo/python/src/pob2/web/static python/src/pob2/web/static
 RUN uv sync --directory python --frozen --no-dev
+# Upstream PoB fixes (patches/README.md), applied to copies in .patched/; src/ stays as upstream ships it.
+COPY patches/ patches/
+COPY library/ library/
+RUN python -m pob2.patches
 USER pob
+# The current build and saved builds; mount a volume here to keep them across container updates.
+VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')"
 CMD ["pob2-web", "--host", "0.0.0.0", "--port", "8080"]

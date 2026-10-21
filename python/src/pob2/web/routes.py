@@ -125,6 +125,117 @@ def new_build(body: NewBuild) -> dict[str, Any]:
     return svc().new_build(body.className, body.ascendancy, body.level)
 
 
+class Label(BaseModel):
+    label: str = Field("Checkpoint", max_length=120)
+
+
+class SaveAs(BaseModel):
+    name: str | None = Field(None, max_length=120)
+
+
+class CompareSource(BaseModel):
+    source: str = Field(description="Share code, link or XML of the build to compare against")
+
+
+class CompareCopy(BaseModel):
+    what: Literal["tree", "item", "config"]
+    slot: str | None = None
+
+
+@router.get("/compare")
+def compare() -> Any:
+    return svc().compare()
+
+
+@router.put("/compare")
+def set_compare(body: CompareSource) -> Any:
+    return svc().set_compare(body.source)
+
+
+@router.delete("/compare")
+def clear_compare() -> Any:
+    svc().clear_compare()
+    return {"cleared": True}
+
+
+@router.post("/compare/copy")
+def copy_from_compare(body: CompareCopy) -> Any:
+    return svc().copy_from_compare(body.what, body.slot)
+
+
+@router.get("/art")
+def item_art(league: str | None = None) -> Any:
+    return svc().item_art(league)
+
+
+@router.get("/gear/jewels")
+def unique_jewels(
+    metric: Literal["balanced", "dps", "ehp"] = "balanced", slot: str | None = None, league: str | None = None
+) -> Any:
+    return svc().unique_jewels(metric, slot, league)
+
+
+@router.get("/designer")
+def design_rare(
+    slot: str,
+    metric: Literal["balanced", "dps", "ehp"] = "balanced",
+    itemLevel: int = Query(82, ge=1, le=100),  # noqa: N803 - query parameter name
+    league: str | None = None,
+) -> Any:
+    return svc().design_rare(slot, metric, itemLevel, league)
+
+
+@router.get("/check")
+def build_check() -> Any:
+    return svc().build_check()
+
+
+@router.get("/history")
+def history() -> Any:
+    return svc().history()
+
+
+@router.post("/history/undo")
+def undo() -> Any:
+    return svc().undo()
+
+
+@router.post("/history/redo")
+def redo() -> Any:
+    return svc().redo()
+
+
+@router.post("/history/checkpoint")
+def checkpoint(body: Label) -> Any:
+    return svc().checkpoint(body.label)
+
+
+@router.post("/history/{entry_id}/restore")
+def restore_history(entry_id: int) -> Any:
+    return svc().restore_history(entry_id)
+
+
+@router.get("/builds")
+def saved_builds() -> Any:
+    return svc().saved_builds()
+
+
+@router.post("/builds")
+def save_build(body: SaveAs) -> Any:
+    return svc().save_build(body.name)
+
+
+@router.post("/builds/{build_id}/open")
+def open_saved_build(build_id: str) -> Any:
+    return svc().open_saved_build(build_id)
+
+
+@router.delete("/builds/{build_id}")
+def delete_saved_build(build_id: str) -> Any:
+    svc().delete_saved_build(build_id)
+    return {"deleted": build_id}
+
+
 @router.post("/build/import")
 def import_build(body: ImportBuild) -> dict[str, Any]:
     return svc().load(body.source)

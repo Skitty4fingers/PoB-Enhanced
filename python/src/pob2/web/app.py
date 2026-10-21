@@ -64,6 +64,7 @@ def create_app(with_mcp: bool = True) -> FastAPI:
         else:
             yield
         if mcp_server._service is not None:
+            mcp_server._service.save_now()  # don't lose a change made in the last second
             mcp_server._service.engine.stop()
 
     app = FastAPI(title="PoB2-Enhanced", version="0.1.0", lifespan=lifespan)

@@ -54,3 +54,4 @@ runtime/SimpleGraphic/Screenshots
 # Local secrets (Tailscale auth key etc.)
 .env
 
+.patched/

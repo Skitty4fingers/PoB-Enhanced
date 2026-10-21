@@ -1,15 +1,25 @@
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, ChevronRight, CircleDot, ClipboardCheck, ExternalLink, Gem, Link2, ListOrdered, Lock, Search, ShoppingCart, Shirt, Sparkles } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, ChevronDown, ChevronRight, CircleDot, ClipboardCheck, ExternalLink, Gem, HeartPulse, Link2, ListOrdered, Lock, Search, ShoppingCart, Shirt, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, qs } from "../../api/client";
 import { useBuildMutation } from "../../api/hooks";
-import type { Gain, GearSlot, GearSlotRef, GemAdvice, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
+import type { Gain, GearSlot, GearSlotRef, GemAdvice, JewelSockets, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
 import { ErrorText } from "../../components/ErrorText";
+import { ItemArt } from "../../components/ItemArt";
 import { ItemVerdict } from "../../components/ItemVerdict";
 import { Modal } from "../../components/Modal";
+import { DesignerButton } from "./DesignerDialog";
+import { HealthSection } from "./HealthSection";
 
 type Metric = "balanced" | "dps" | "ehp";
-type Section = "check" | "gear" | "jewels" | "sockets" | "gems" | "shop";
+type Section = "health" | "check" | "gear" | "jewels" | "sockets" | "gems" | "shop";
+const SECTIONS: Section[] = ["health", "check", "gear", "jewels", "sockets", "gems", "shop"];
+
+/** The section named in the URL (#upgrades/sockets), if any. */
+function sectionFromHash(): Section | null {
+  const sub = window.location.hash.slice(1).split("/")[1] as Section | undefined;
+  return sub && SECTIONS.includes(sub) ? sub : null;
+}
 
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
 const tone = (v: number) => (v > 0.05 ? "text-good" : v < -0.05 ? "text-bad" : "text-ink-400");
@@ -39,12 +49,13 @@ function TradeLink({ url, label = "Search trade" }: { url?: string; label?: stri
 
 // -- gear & jewels ------------------------------------------------------------------------------------------
 
-function SlotCard({ data, uniques, open, onToggle }: { data: GearSlot; uniques?: UniqueSuggestion[]; open: boolean; onToggle: () => void }) {
+function SlotCard({ data, uniques, open, onToggle, metric, league }: { data: GearSlot; uniques?: UniqueSuggestion[]; open: boolean; onToggle: () => void; metric: Metric; league?: string }) {
   return (
     <div className="panel">
       <button className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left" onClick={onToggle}>
         {open ? <ChevronDown size={14} className="text-ink-400" /> : <ChevronRight size={14} className="text-ink-400" />}
         <span className="w-28 shrink-0 text-sm text-ink-400">{data.slot.replace(/^Jewel \d+$/, "Jewel socket")}</span>
+        {data.item && <ItemArt item={data.item} size={28} className="shrink-0" />}
         <span className={`min-w-0 flex-1 truncate text-sm ${rarityColor(data.item?.rarity)}`}>{data.item?.name ?? <span className="text-ink-400">Empty{data.testBase ? ` (evaluated as ${data.testBase})` : ""}</span>}</span>
         {data.modsWorth && <span className="text-xs text-ink-400">mods worth <GainText g={data.modsWorth} compact /></span>}
         {data.deadMods ? <span className="rounded bg-bad/15 px-1.5 py-0.5 text-xs text-bad">{data.deadMods} dead mod{data.deadMods > 1 ? "s" : ""}</span> : null}
@@ -75,7 +86,10 @@ function SlotCard({ data, uniques, open, onToggle }: { data: GearSlot; uniques?:
           <div>
             <div className="mb-1.5 flex items-center gap-2">
               <span className="label">Look for on a replacement</span>
-              <span className="ml-auto"><TradeLink url={data.tradeUrl} /></span>
+              <span className="ml-auto flex gap-1">
+                {data.item && !/^Jewel/.test(data.slot) && !/^(Flask|Charm)/.test(data.slot) && <DesignerButton slot={data.slot} metric={metric} league={league} />}
+                <TradeLink url={data.tradeUrl} />
+              </span>
             </div>
             {data.unsupported ? <p className="text-sm text-ink-400">PoB can't weight trade searches for this slot.</p> : (
               <ol className="space-y-0.5 text-sm">
@@ -113,7 +127,17 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
   const done = results.filter((r) => r.data).map((r) => r.data!) as GearSlot[];
   const ranked = [...done].sort((a, b) => (b.headroom ?? 0) - (a.headroom ?? 0));
   const pending = results.length - done.length;
-  const uniqueFor = (slot: string) => uniques?.slots.find((g) => (jewels ? g.slot === "Jewel" : slot.startsWith(g.slot)))?.items;
+  // Jewel sockets get their own search: every unique jewel and variant measured in that socket.
+  const sockets = useQuery({
+    queryKey: ["gear-jewels", metric, league],
+    queryFn: () => api.get<JewelSockets>(`/gear/jewels${qs({ metric, league })}`),
+    enabled: jewels,
+    staleTime: 60_000,
+  });
+  const uniqueFor = (slot: string) =>
+    jewels
+      ? sockets.data?.sockets.find((s) => s.slot === slot)?.suggestions
+      : uniques?.slots.find((g) => slot.startsWith(g.slot))?.items;
   const best = ranked[0];
   const emptySockets = jewels ? mine.filter((s) => !s.item).length : 0;
 
@@ -137,10 +161,33 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
         <p className="flex items-center gap-2 text-sm text-rare"><AlertTriangle size={14} /> {emptySockets} allocated jewel socket{emptySockets > 1 ? "s are" : " is"} empty.</p>
       )}
       {pending > 0 && <p className="text-xs text-ink-400">Analysing {pending} more slot{pending > 1 ? "s" : ""}…</p>}
+      {jewels && sockets.isLoading && <p className="text-xs text-ink-400">Trying every unique jewel and variant in each socket (about a minute the first time)…</p>}
+      {jewels && sockets.data && <JewelHighlights data={sockets.data} />}
       {ranked.map((d) => (
-        <SlotCard key={d.slot} data={d} uniques={uniqueFor(d.slot)} open={open === d.slot} onToggle={() => setOpen(open === d.slot ? null : d.slot)} />
+        <SlotCard key={d.slot} data={d} uniques={uniqueFor(d.slot)} open={open === d.slot} onToggle={() => setOpen(open === d.slot ? null : d.slot)} metric={metric} league={league} />
       ))}
       {!slots.isLoading && mine.length === 0 && <p className="text-sm text-ink-400">No {jewels ? "allocated jewel sockets" : "gear slots"}.</p>}
+    </div>
+  );
+}
+
+/** The single best unique jewel across sockets, so a great cheap pick (like a 1 ex Prism of Belief) stands out. */
+function JewelHighlights({ data }: { data: JewelSockets }) {
+  const all = data.sockets.flatMap((s) => s.suggestions.map((u) => ({ ...u, socket: s.slot, current: s.current })));
+  if (!all.length) return null;
+  const best = all.reduce((a, b) => (b.score > a.score ? b : a));
+  return (
+    <div className="panel flex flex-wrap items-center gap-3 border-l-4 border-l-unique px-4 py-3 text-sm">
+      <Sparkles size={16} className="text-unique" />
+      <div className="min-w-0 flex-1">
+        <span className="text-ink-400">Best unique jewel: </span>
+        <span className="text-unique">{best.name}</span>
+        {best.variant && <span className="text-gold-soft"> ({best.variant})</span>}
+        <span className="text-ink-400"> in {best.socket.replace(/^Jewel \d+$/, "a socket")}{best.current ? ` instead of ${best.current}` : ""}: </span>
+        <GainText g={best} />
+        {best.price && <span className="text-ink-400"> · {best.price}</span>}
+      </div>
+      {best.tradeUrl && <TradeLink url={best.tradeUrl} />}
     </div>
   );
 }
@@ -201,9 +248,10 @@ function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: b
       <tbody>
         {rows.map((u) => (
           <tr key={u.name} className="border-t border-ink-800">
+            <td className="w-10 py-1.5 pr-2"><ItemArt item={{ rarity: "UNIQUE", title: u.name, baseName: u.baseName }} size={32} /></td>
             <td className="py-1.5 pr-2">
               <div className="text-unique">{u.name}</div>
-              <div className="text-xs text-ink-400">{u.baseName}{u.levelRequirement ? ` · lvl ${u.levelRequirement}` : ""}{showSlot ? ` · ${u.slot.replace(/^Jewel \d+$/, "jewel")}` : ""}</div>
+              <div className="text-xs text-ink-400">{u.variant ? <span className="text-gold-soft">pick: {u.variant}</span> : u.baseName}{u.levelRequirement ? ` · lvl ${u.levelRequirement}` : ""}{showSlot ? ` · ${u.slot.replace(/^Jewel \d+$/, "jewel")}` : ""}</div>
             </td>
             <td className="pr-2 text-xs"><GainText g={u} /></td>
             <td className="pr-2 text-right tabular-nums">
@@ -211,7 +259,7 @@ function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: b
             </td>
             <td className="whitespace-nowrap text-right">
               <span className="inline-flex items-center gap-2">
-                <CheckUniqueButton name={u.name} baseName={u.baseName} />
+                {!u.variant && <CheckUniqueButton name={u.name} baseName={u.baseName} />}
                 {u.tradeUrl && <a className="text-gold hover:underline" href={u.tradeUrl} target="_blank" rel="noreferrer" title="Search trade"><ShoppingCart size={14} /></a>}
               </span>
             </td>
@@ -527,7 +575,16 @@ function GemsSection({ metric }: { metric: Metric }) {
 // -- tab ----------------------------------------------------------------------------------------------------
 
 export function UpgradesTab() {
-  const [section, setSection] = useState<Section>("check");
+  const [section, setSectionState] = useState<Section>(() => sectionFromHash() ?? "health");
+  useEffect(() => {
+    const onHash = () => { const s = sectionFromHash(); if (s) setSectionState(s); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const setSection = (s: Section) => {
+    setSectionState(s);
+    history.replaceState(null, "", `#upgrades/${s}`);
+  };
   const [metric, setMetric] = useState<Metric>("balanced");
   const [league, setLeague] = useState<string | undefined>();
   const [budget, setBudget] = useState("");
@@ -540,6 +597,7 @@ export function UpgradesTab() {
     enabled: section === "shop" || section === "gear" || section === "jewels",
   });
   const sections: { id: Section; label: string; icon: ReactNode }[] = [
+    { id: "health", label: "Build check", icon: <HeartPulse size={14} /> },
     { id: "check", label: "Check item", icon: <ClipboardCheck size={14} /> },
     { id: "gear", label: "Gear", icon: <Shirt size={14} /> },
     { id: "jewels", label: "Jewels", icon: <Sparkles size={14} /> },
@@ -575,6 +633,7 @@ export function UpgradesTab() {
           )}
         </div>
       </div>
+      {section === "health" && <HealthSection />}
       {section === "check" && <CheckSection />}
       {section === "gear" && <GearSection jewels={false} metric={metric} league={activeLeague} uniques={uniques.data} />}
       {section === "jewels" && <GearSection jewels metric={metric} league={activeLeague} uniques={uniques.data} />}

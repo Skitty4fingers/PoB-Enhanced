@@ -14,6 +14,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
+from pob2 import patches
+
 log = logging.getLogger("pob2.engine")
 
 DEFAULT_START_TIMEOUT = 120.0
@@ -85,6 +87,10 @@ class Engine:
             if self.running:
                 return
             self._lines = queue.Queue()
+            try:
+                patches.ensure(self.root)  # upstream fixes, loaded by engine/pobapi/boot.lua
+            except Exception:  # noqa: BLE001 - never block the engine on the patch step
+                log.exception("Applying patches/ failed; running unpatched")
             env = {**os.environ, "CI": ""}
             self._proc = subprocess.Popen(
                 [self.luajit, str(self.root / "engine" / "worker.lua")],

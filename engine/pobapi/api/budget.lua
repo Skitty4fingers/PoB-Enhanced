@@ -417,9 +417,12 @@ function M.check_item(params)
 	end
 	reasons[#reasons + 1] = ("Effective HP %+.1f%%"):format(ehpPct)
 	local lostTotems = main and main.totemsBefore and main.totemsAfter and main.totemsAfter < main.totemsBefore
-	if dpsPct <= -2 or ehpPct <= -5 or lostTotems or (cmp.after.spiritShort and not cmp.before.spiritShort) then
+	-- Lost totems or a new Spirit shortfall always lose. Otherwise weigh damage against defence: a big gain on one
+	-- side outweighs a small loss on the other, but a loss of more than 15% on either side is never an upgrade.
+	local net = dpsPct + ehpPct
+	if lostTotems or (cmp.after.spiritShort and not cmp.before.spiritShort) or net <= -2 then
 		verdict = "downgrade"
-	elseif (dpsPct >= 2 and ehpPct > -2) or (ehpPct >= 3 and dpsPct > -1) then
+	elseif net >= 2 and dpsPct > -15 and ehpPct > -15 then
 		verdict = "upgrade"
 	else
 		verdict = "sidegrade"

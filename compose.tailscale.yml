@@ -29,6 +29,8 @@ services:
     environment:
       POB2_ALLOWED_HOSTS: ${TS_HOSTNAME:-pob2}.${TS_TAILNET:?Set TS_TAILNET in .env, e.g. tail1234.ts.net}
     command: ["pob2-web", "--host", "127.0.0.1", "--port", "8080"]
+    volumes:
+      - pob2-data:/data   # current build and saved builds (kept across updates)
     depends_on:
       - tailscale
     restart: unless-stopped
@@ -37,3 +39,4 @@ services:
 
 volumes:
   tailscale-state:
+  pob2-data:

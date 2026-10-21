@@ -10,7 +10,7 @@ import argparse
 import functools
 import logging
 import sys
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import httpx
 from mcp.server.mcpserver import MCPServer
@@ -18,9 +18,11 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from pob2 import library as game_library
 from pob2.codec import CodecError
 from pob2.engine import EngineError
 from pob2.service import PoBService
+from pob2.store import BuildStore
 
 log = logging.getLogger("pob2.mcp")
 
@@ -39,6 +41,9 @@ reports totem DPS per totem; check_item/get_budget count the totems the Spirit b
 gear_advice, shopping_advice and gem_advice cover items, jewels, uniques to buy and gems; refresh_build re-imports.
 Stat values are PoB's calculated numbers for the current configuration (see list_config);
 enemy conditions and buffs in the config strongly affect DPS.
+Game facts PoB doesn't know (points per level, gem tiers, Spirit, caps) are in the library tool.
+Every change is undoable: checkpoint before experimenting, then undo / restore_history to go back. The user sees the
+same live build in the web UI. save_build keeps a named copy in the user's library (list_saved_builds).
 """
 
 mcp = MCPServer("pob2-enhanced", title="Path of Building 2", instructions=INSTRUCTIONS, version="0.1.0")
@@ -70,7 +75,12 @@ def tool(annotations: ToolAnnotations) -> Any:
 def svc() -> PoBService:
     global _service
     if _service is None:
-        _service = PoBService()
+        _service = PoBService(store=BuildStore())
+        try:
+            if _service.restore_saved_state():
+                log.info("Restored the build from %s", _service.store.root if _service.store else "?")
+        except Exception:  # noqa: BLE001 - a bad saved state must not stop the server
+            log.exception("Could not restore the saved build")
     return _service
 
 
@@ -79,7 +89,9 @@ def svc() -> PoBService:
 
 @tool(REPLACE)
 def load_build(
-    source: Annotated[str, Field(description="PoB share code, pobb.in/pastebin/poe.ninja link, or build XML")],
+    source: Annotated[
+        str, Field(description="PoB share code, build XML, or a pobb.in/pastebin/poe.ninja/Maxroll/poe2db/Rentry link")
+    ],
 ) -> dict[str, Any]:
     """Load a build, replacing the active one. Returns basic build info."""
     return svc().load(source)
@@ -93,6 +105,66 @@ def new_build(
 ) -> dict[str, Any]:
     """Start an empty build, replacing the active one."""
     return svc().new_build(class_name, ascendancy, level)
+
+
+# -- history and saved builds ----------------------------------------------------------------------
+
+
+@tool(WRITE)
+def undo() -> dict[str, Any]:
+    """Undo the last change to the build (yours, the user's or another agent's). Returns the remaining history."""
+    return svc().undo()
+
+
+@tool(WRITE)
+def redo() -> dict[str, Any]:
+    """Redo the last undone change."""
+    return svc().redo()
+
+
+@tool(READ)
+def get_history() -> dict[str, Any]:
+    """Undo/redo entries, newest first: what each change was and when."""
+    return svc().history()
+
+
+@tool(WRITE)
+def checkpoint(label: Annotated[str, Field(description="Name for this point, e.g. 'before respec'")]) -> dict[str, Any]:
+    """Remember the build as it is now, to come back to with restore_history after experimenting."""
+    return svc().checkpoint(label)
+
+
+@tool(WRITE)
+def restore_history(entry_id: Annotated[int, Field(description="id from get_history")]) -> dict[str, Any]:
+    """Go back to the build as it was at a history entry (a checkpoint, or before a change). Undoable."""
+    return svc().restore_history(entry_id)
+
+
+@tool(WRITE)
+def save_build(
+    name: Annotated[str | None, Field(description="Name in the library (default: the build's name)")] = None,
+) -> dict[str, Any]:
+    """Save a copy of the current build to the user's library. The same name overwrites."""
+    return svc().save_build(name)
+
+
+@tool(READ)
+def list_saved_builds() -> list[dict[str, Any]]:
+    """The user's saved builds (id, name, class, level, main skill, when saved), newest first."""
+    return svc().saved_builds()
+
+
+@tool(REPLACE)
+def open_saved_build(build_id: Annotated[str, Field(description="id from list_saved_builds")]) -> dict[str, Any]:
+    """Open a saved build, replacing the active one (undoable)."""
+    return svc().open_saved_build(build_id)
+
+
+@tool(REPLACE)
+def delete_saved_build(build_id: Annotated[str, Field(description="id from list_saved_builds")]) -> dict[str, str]:
+    """Delete a saved build from the library. This cannot be undone."""
+    svc().delete_saved_build(build_id)
+    return {"deleted": build_id}
 
 
 @tool(READ)
@@ -452,6 +524,77 @@ def socket_advice(
     if optimize:
         res = {**res, "plan": svc().socket_plan(metric)}
     return res
+
+
+@tool(READ)
+def compare_with_build(
+    source: Annotated[
+        str | None,
+        Field(
+            description="Share code, link (pobb.in, poe.ninja character page, ...) or XML; omit to reuse the loaded one"
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Compare the live build with another (e.g. a top ladder character): DPS/EHP and stats side by side, items per
+    slot, skills and supports, notables only one has, config differences. The live build is not changed."""
+    if source:
+        return svc().set_compare(source)
+    data = svc().compare()
+    if data is None:
+        raise ValueError("Pass source: no build loaded for comparison yet")
+    return data
+
+
+@tool(WRITE)
+def copy_from_compared_build(
+    what: Annotated[Literal["tree", "item", "config"], Field(description="What to copy into the live build")],
+    slot: Annotated[str | None, Field(description="Item slot, for what='item'")] = None,
+) -> dict[str, Any]:
+    """Copy the compared build's passive tree, its config, or its item in one slot into the live build (undoable)."""
+    return svc().copy_from_compare(what, slot)
+
+
+@tool(READ)
+def library(
+    topic: Annotated[
+        str | None, Field(description="Topic from the index, e.g. 04-skills-and-gems; omit for the index")
+    ] = None,
+) -> dict[str, Any]:
+    """PoE2 game knowledge PoB doesn't carry: passive points per level, gem tiers by level, Spirit, caps, keystones,
+    runes and augments, and guard rails for judging a change. Read 07-advising-builds and 16-evaluating-changes
+    before giving build advice."""
+    return game_library.read(topic) if topic else game_library.index()
+
+
+@tool(READ)
+def suggest_unique_jewels(
+    metric: Metric = "balanced",
+    slot: Annotated[str | None, Field(description="One jewel socket (e.g. Jewel 26196); omit for all")] = None,
+    league: Annotated[str | None, Field(description="Trade league for prices and links")] = None,
+) -> dict[str, Any]:
+    """Best unique jewels for each allocated jewel socket, every current variant tried (which skill, which god, ring
+    size...) and measured in place, so radius jewels count the nodes around that socket. With poe.ninja prices."""
+    return svc().unique_jewels(metric, slot, league)
+
+
+@tool(READ)
+def design_rare(
+    slot: Annotated[str, Field(description="Gear slot, e.g. Ring 1, Gloves, Body Armour")],
+    metric: Metric = "balanced",
+    item_level: Annotated[int, Field(ge=1, le=100, description="Item level that limits mod tiers")] = 82,
+    league: Annotated[str | None, Field(description="Trade league for the search link")] = None,
+) -> dict[str, Any]:
+    """Design the best rare for a slot from the real mod pool: keeps the slot's base, sockets, runes and implicits,
+    picks up to 3 prefixes and 3 suffixes, each measured in this build. Returns the item text (check_item or
+    equip_item can use it), each mod's gain, and a trade search for items like it. Rolls are top-of-range."""
+    return svc().design_rare(slot, metric, item_level, league)
+
+
+@tool(READ)
+def build_check() -> dict[str, Any]:
+    """Health check: what is wrong with the build, worst first (uncapped resistances, unspent points, few supports,
+    unmet requirements, Spirit, empty slots, sustain...), each with a fix. Start reviews and advice here."""
+    return svc().build_check()
 
 
 @tool(READ)

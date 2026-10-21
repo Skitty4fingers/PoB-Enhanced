@@ -125,6 +125,69 @@ export interface BudgetCompare {
   warnings: string[];
 }
 
+export interface CompareSide {
+  name?: string;
+  className?: string;
+  ascendClassName?: string;
+  level?: number;
+  mainSkill?: string;
+  skill?: string;
+  totems?: number;
+  treeUrl?: string;
+}
+
+export interface CompareResult {
+  source?: string | null;
+  mine: CompareSide;
+  theirs: CompareSide;
+  stats: { key: string; label: string; mine: number; theirs: number; pct: number | null; theirsBetter: boolean | null }[];
+  items: { slot: string; mine?: string | null; theirs?: string | null; theirsText?: string | null; same: boolean }[];
+  skills: {
+    skill: string;
+    inMine: boolean;
+    inTheirs: boolean;
+    mainInMine: boolean;
+    mainInTheirs: boolean;
+    supportsOnlyTheirs: string[];
+    supportsOnlyMine: string[];
+  }[];
+  tree: { mineNodes: number; theirsNodes: number; shared: number; notablesOnlyTheirs: string[]; notablesOnlyMine: string[] };
+  config: { var: string; label: string; mine: unknown; theirs: unknown }[];
+}
+
+export interface DesignedRare {
+  slot: string;
+  base: string;
+  itemLevel: number;
+  replaces: string;
+  text: string;
+  mods: { type: "Prefix" | "Suffix"; affix?: string; family: string; tier: number; lines: string[]; gain: number }[];
+  gain: { score: number; dpsPercent: number; ehpPercent: number };
+  openAffixes: { prefixes: number; suffixes: number };
+  tradeUrl?: string;
+  note: string;
+}
+
+export interface JewelSockets {
+  metric: string;
+  league?: string;
+  sockets: { slot: string; nodeId: number; current?: string; suggestions: UniqueSuggestion[] }[];
+}
+
+export interface Finding {
+  severity: "high" | "medium" | "low";
+  area: string;
+  message: string;
+  fix: string;
+  tab?: string;
+}
+
+export interface BuildCheck {
+  findings: Finding[];
+  counts: { high: number; medium: number; low: number };
+  level: number;
+}
+
 export interface Resource {
   key: string;
   label: string;
@@ -451,6 +514,8 @@ export interface GearSlot {
 }
 
 export interface UniqueSuggestion extends Gain {
+  /** The variant to pick (Prism of Belief's skill, Megalomaniac's notables...), for per-socket jewel suggestions. */
+  variant?: string;
   name: string;
   baseName?: string;
   slot: string;

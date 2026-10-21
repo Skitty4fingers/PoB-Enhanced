@@ -101,6 +101,62 @@ def unique_prices(league: str) -> dict[str, Any]:
     return {"rates": rates, "items": items}
 
 
+def unique_icons(league: str) -> list[dict[str, Any]]:
+    """Every unique's official icon from poe.ninja's economy data."""
+    out: list[dict[str, Any]] = []
+    for kind in UNIQUE_TYPES:
+        try:
+            data = _get_json(
+                f"{NINJA}/poe2/api/economy/stash/current/item/overview",
+                ttl=1800,
+                params={"league": league, "type": kind},
+            )
+        except httpx.HTTPError:
+            continue
+        for line in data.get("lines") or []:
+            out.append(
+                {"name": line.get("name"), "baseType": line.get("baseType"), "icon": line.get("icon"), "unique": True}
+            )
+    return out
+
+
+def _character_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+    out = []
+    for key in ("items", "flasks", "jewels"):
+        for entry in data.get(key) or []:
+            it = entry.get("itemData") or entry
+            out.append(
+                {
+                    "name": it.get("name") or None,
+                    "baseType": it.get("baseType") or it.get("typeLine"),
+                    "icon": it.get("icon"),
+                    "unique": it.get("frameType") in (3, 9),  # unique, relic
+                }
+            )
+    return out
+
+
+def character_art(link: str) -> list[dict[str, Any]]:
+    """Icons of everything a poe.ninja character wears (uses the same cached request as character_code)."""
+    parsed = parse_character_url(link)
+    if not parsed:
+        return []
+    kind, slug, account, name = parsed
+    if kind == "profile":
+        path = f"/poe2/api/profile/characters/{quote(account)}/{quote(slug)}/{quote(name)}"
+        data = _get_json(f"{NINJA}{path}/model/{int(time.time() // 60)}", ttl=60)
+        return _character_items(data.get("charModel") or {})
+    snapshot = next((s for s in index_state().get("snapshotVersions", []) if s.get("url") == slug), None)
+    if not snapshot:
+        return []
+    data = _get_json(
+        f"{NINJA}/poe2/api/builds/{snapshot['version']}/character",
+        ttl=60,
+        params={"account": account, "name": name, "overview": snapshot["snapshotName"], "timeMachine": ""},
+    )
+    return _character_items(data)
+
+
 def format_price(divine: float, rates: dict[str, float]) -> str:
     if divine >= 1:
         return f"{divine:,.1f} div" if divine < 100 else f"{divine:,.0f} div"

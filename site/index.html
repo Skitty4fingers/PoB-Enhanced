@@ -50,8 +50,11 @@
           <div class="card"><h3><span class="ico">⌁</span> Passive advisor</h3><p>The best next point with its path, the cheapest point to move, and which +5 attribute nodes to switch.</p></div>
           <div class="card"><h3><span class="ico">✓</span> Check before you buy</h3><p>Paste any item for an upgrade / sidegrade / downgrade verdict across every skill, with totem, Spirit and requirement warnings.</p></div>
           <div class="card"><h3><span class="ico">◎</span> Socket optimiser</h3><p>What every rune, soul core and idol is worth, the best legal swaps, and a combined plan that respects every limit.</p></div>
-          <div class="card"><h3><span class="ico">⬡</span> Gear, gems and shop</h3><p>Mod worth with dead mods flagged, weighted trade searches, support swaps, and uniques ranked with poe.ninja prices.</p></div>
+          <div class="card"><h3><span class="ico">⬡</span> Gear, gems and shop</h3><p>Mod worth with dead mods flagged, the best rare designed from the real mod pool, unique jewels per socket, and uniques ranked with poe.ninja prices.</p></div>
           <div class="card"><h3><span class="ico">≡</span> Build guides</h3><p>Upload a Maxroll or in-game planner <code>.build</code> file and see the gap: passives, skills, gear, and next steps by gain per point.</p></div>
+          <div class="card"><h3><span class="ico">✚</span> Build check</h3><p>What is wrong with the build, worst first, each with a fix: resistances, unspent points, supports, requirements, Spirit, empty slots.</p></div>
+          <div class="card"><h3><span class="ico">⇄</span> Compare any build</h3><p>A ladder character or a guide next to yours: stats, items, skills, notables and config, with one-click copy.</p></div>
+          <div class="card"><h3><span class="ico">↶</span> Undo and saved builds</h3><p>Undo any change, even an AI agent's. Your build survives restarts, and named copies stay in your library.</p></div>
           <div class="card"><h3><span class="ico">✦</span> AI agents (MCP)</h3><p>About 50 tools let Claude or any MCP client load, what-if and edit your build. The UI updates live as the agent works.</p></div>
         </div>
       </div>
@@ -126,7 +129,7 @@
       <div class="wrap">
         <div class="eyebrow">Get started</div>
         <h2>One command with Docker</h2>
-        <pre><code>docker run -d --name pob-enhanced --restart unless-stopped -p 8080:8080 ghcr.io/skitty4fingers/pob-enhanced:latest</code></pre>
+        <pre><code>docker run -d --name pob-enhanced --restart unless-stopped -p 8080:8080 -v pob2-data:/data ghcr.io/skitty4fingers/pob-enhanced:latest</code></pre>
         <p>Then open <a href="http://localhost:8080">http://localhost:8080</a> and import your character.
           NAS, Compose, Tailscale and no-Docker setups are in the <a href="deploy.html">deployment guide</a>.</p>
       </div>
