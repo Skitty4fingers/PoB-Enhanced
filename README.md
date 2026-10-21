@@ -82,13 +82,23 @@ same advisors as the UI, plus a PoE2 knowledge library (points per level, gem ti
 [PoB Redux](https://github.com/pobredux/pob-redux). The web UI and an agent share one live build, and everything an
 agent does can be undone.
 
-| Upgrades: gear | Sockets | Shop |
-|---|---|---|
-| ![Gear advice](docs/images/upgrades-gear.png) | ![Socket optimiser](docs/images/sockets.png) | ![Shop](docs/images/shop.png) |
+### Screenshots
 
-| Guide | Help |
-|---|---|
-| ![Guide comparison](docs/images/guide.png) | ![In-app help](docs/images/help.png) |
+| Build check | Compare with any build | Design best rare |
+|---|---|---|
+| ![Build check](docs/images/build-check.png) | ![Compare](docs/images/compare.png) | ![Rare designer](docs/images/designer.png) |
+
+| Unique jewels per socket | Sockets | Search (Ctrl+K) |
+|---|---|---|
+| ![Unique jewels](docs/images/jewels.png) | ![Socket optimiser](docs/images/sockets.png) | ![Command palette](docs/images/palette.png) |
+
+| Items with game art | Saved builds | Gear advice |
+|---|---|---|
+| ![Items](docs/images/items.png) | ![Saved builds](docs/images/builds.png) | ![Gear advice](docs/images/upgrades-gear.png) |
+
+| Shop | Guide | Help |
+|---|---|---|
+| ![Shop](docs/images/shop.png) | ![Guide comparison](docs/images/guide.png) | ![In-app help](docs/images/help.png) |
 
 ## Run it
 
