@@ -72,7 +72,13 @@ def create_app(with_mcp: bool = True) -> FastAPI:
 
     @app.exception_handler(EngineError)
     async def engine_error(_: Request, exc: EngineError) -> JSONResponse:
-        status = {"bad_request": 400, "not_found": 404, "method_not_found": 404, "timeout": 504}.get(exc.code, 500)
+        status = {
+            "bad_request": 400,
+            "not_found": 404,
+            "method_not_found": 404,
+            "load_failed": 422,
+            "timeout": 504,
+        }.get(exc.code, 500)
         return JSONResponse({"error": str(exc), "code": exc.code}, status_code=status)
 
     @app.exception_handler(CodecError)

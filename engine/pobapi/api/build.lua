@@ -43,7 +43,19 @@ function M.load_xml(params)
 	if not xml:find("<PathOfBuilding", 1, true) then
 		util.fail("Not a Path of Building build XML")
 	end
-	session.setMode(params.name or "Imported Build", xml)
+	local b = session.build()
+	local okSave, previousXml = pcall(b.SaveDB, b, "code")
+	local previousName = b.buildName
+	local ok, err = pcall(session.setMode, params.name or "Imported Build", xml)
+	if not ok then
+		-- Put the previous build back so a bad XML doesn't leave a half-loaded one behind.
+		if okSave and previousXml then
+			pcall(session.setMode, previousName, previousXml)
+		else
+			pcall(session.setMode, "New Build")
+		end
+		error(err, 0)
+	end
 	session.frame()
 	return M.info()
 end

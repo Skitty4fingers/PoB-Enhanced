@@ -64,6 +64,11 @@ function M.start()
 	dofile("Launch.lua")
 	__mainObject__.continuousIntegrationMode = os.getenv("CI")
 	runCallback("OnInit")
+	-- Running from a checkout puts PoB in dev mode, which saves ~~temp~~.xml whenever a build closes. The worker never
+	-- writes build files, and that save throws for a build whose load failed, which then blocks every later load.
+	if __mainObject__.main then
+		__mainObject__.main.disableDevAutoSave = true
+	end
 	runCallback("OnFrame")
 
 	if __mainObject__.promptMsg then

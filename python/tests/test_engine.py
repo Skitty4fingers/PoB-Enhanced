@@ -2,6 +2,7 @@
 
 import base64
 import json
+import re
 
 import pytest
 
@@ -102,6 +103,83 @@ def test_undo_redo_and_checkpoints(service):
     service.new_build("Ranger", "Deadeye", 50)
     service.undo()
     assert service.info()["className"] == "Witch"
+
+
+TALISMAN = """Item Class: Talismans
+Rarity: Unique
+Hysseg's Claw
+Familial Talisman
+--------
+Item Level: 75
+--------
+Minions deal 49% increased Damage (implicit)
+--------
+Grants Skill: Level 16 Cackling Companions
+92% increased Physical Damage
+5% increased Movement Speed
++10 to Strength
++10 to Intelligence
+7% increased Damage per Minion"""
+
+
+@pytest.fixture
+def druid(service):
+    """Druid/Oracle with a real tree, including an attribute node set to Intelligence."""
+    service.new_build("Druid", "Oracle", 88)
+    service.call("skills.add", gems=["Fireball"])
+    tree = service.call("tree.allocate", ids=[34553])  # Emboldening Lead
+    assert tree["failed"] == [] and tree["pointsUsed"] > 5
+    for node in tree["nodes"]:
+        try:
+            service.set_attributes([{"id": node["id"], "attribute": "Intelligence"}])
+            break
+        except EngineError:
+            continue  # not an attribute node
+    return service
+
+
+def _character(svc):
+    info = svc.info()
+    return info["className"], info["ascendClassName"], info["pointsUsed"]
+
+
+def test_restore_after_weapon_swap_skill_keeps_tree(druid):
+    # Checkpoint, equip a swap talisman and make its slot-bound skill the main one, then go back.
+    before = _character(druid)
+    cp = druid.checkpoint("before talisman")["undo"][0]
+    druid.call("items.equip", text=TALISMAN, slot="Weapon 1 Swap")
+    group = next(g for g in druid.call("skills.list") if g.get("slot") == "Weapon 1 Swap")
+    druid.call("skills.set_main", group=group["index"])
+    assert _character(druid) == before
+    druid.restore_history(cp["id"])
+    assert _character(druid) == before
+    druid.undo()
+    assert _character(druid) == before and druid.info()["mainSocketGroup"] == group["index"]
+    druid.load(druid.export()["xml"])
+    assert _character(druid) == before
+
+
+def test_failed_load_keeps_the_build_and_later_loads_work(druid):
+    # A build whose tree section throws in PoB used to load as an empty Ranger tree without an error, and left the
+    # engine so that every later load (undo, import, saved builds) did the same until the worker restarted.
+    before = _character(druid)
+    xml = druid.export()["xml"]
+    # An attribute override without its node lists makes PoB's PassiveSpec:Load throw.
+    broken = re.sub(r"(<Spec [^>]*[^/]>)", r"\1<Overrides><AttributeOverride/></Overrides>", xml, count=1)
+    assert broken != xml
+    cp = druid.checkpoint("good")["undo"][0]
+    with pytest.raises(EngineError, match="could not load the build"):
+        druid.load(broken)
+    assert _character(druid) == before
+    druid.new_build("Witch", "Infernalist", 50)
+    druid.load(xml)
+    assert _character(druid) == before
+    druid.new_build("Witch", "Infernalist", 50)
+    druid.restore_history(cp["id"])
+    assert _character(druid) == before
+    with pytest.raises(EngineError, match="could not load the build"):
+        druid.load("<PathOfBuilding2><Build")
+    assert _character(druid) == before
 
 
 def test_saved_builds_and_restart(service, tmp_path):
