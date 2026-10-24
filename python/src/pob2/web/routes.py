@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from pob2 import mcp_server
+from pob2.version import build_info
 
 router = APIRouter()
 
@@ -110,7 +111,13 @@ class ReferenceUpload(BaseModel):
 @router.get("/health")
 def health() -> dict[str, Any]:
     s = svc()
-    return {"ok": True, "engineRunning": s.engine.running, "revision": s.revision}
+    return {"ok": True, "engineRunning": s.engine.running, "revision": s.revision, **build_info(s.engine.root)}
+
+
+@router.get("/version")
+def version() -> dict[str, Any]:
+    """Package version, git commit and build time: compare the commit with `git rev-parse --short=9 HEAD`."""
+    return build_info(svc().engine.root)
 
 
 @router.get("/revision")

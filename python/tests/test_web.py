@@ -27,6 +27,12 @@ def test_build_flow(client):
     assert overview["skills"][0]["gems"][0]["name"] == "Lightning Arrow"
 
 
+def test_version_endpoint(client):
+    info = client.get("/api/version").json()
+    assert info["version"] and "commit" in info and "built" in info
+    assert client.get("/api/health").json()["version"] == info["version"]
+
+
 def test_errors_map_to_http(client):
     r = client.post("/api/items/parse", json={"text": "garbage"})
     assert r.status_code == 400 and "parse" in r.json()["error"]

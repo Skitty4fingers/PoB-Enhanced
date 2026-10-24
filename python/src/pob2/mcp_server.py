@@ -23,6 +23,7 @@ from pob2.codec import CodecError
 from pob2.engine import EngineError
 from pob2.service import PoBService
 from pob2.store import BuildStore
+from pob2.version import __version__
 
 log = logging.getLogger("pob2.mcp")
 
@@ -46,7 +47,7 @@ Every change is undoable: checkpoint before experimenting, then undo / restore_h
 same live build in the web UI. save_build keeps a named copy in the user's library (list_saved_builds).
 """
 
-mcp = MCPServer("pob2-enhanced", title="Path of Building 2", instructions=INSTRUCTIONS, version="0.1.0")
+mcp = MCPServer("pob2-enhanced", title="Path of Building 2", instructions=INSTRUCTIONS, version=__version__)
 _service: PoBService | None = None
 
 READ = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)

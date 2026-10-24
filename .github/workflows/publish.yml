@@ -29,6 +29,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build identity shown in the web UI header and at /api/version (same stamp as scripts/build-image.sh).
+      - id: stamp
+        run: |
+          echo "version=$(sed -n 's/^version = "\(.*\)"/\1/p' python/pyproject.toml | head -1)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short=9 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - id: meta
         uses: docker/metadata-action@v5
         with:
@@ -48,5 +54,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.stamp.outputs.version }}
+            GIT_COMMIT=${{ steps.stamp.outputs.commit }}
+            BUILD_TIME=${{ steps.stamp.outputs.built }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

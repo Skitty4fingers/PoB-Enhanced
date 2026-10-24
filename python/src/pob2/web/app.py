@@ -21,6 +21,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from pob2 import mcp_server
 from pob2.codec import CodecError
 from pob2.engine import EngineError, find_repo_root
+from pob2.version import __version__
 from pob2.web import routes
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -67,7 +68,7 @@ def create_app(with_mcp: bool = True) -> FastAPI:
             mcp_server._service.save_now()  # don't lose a change made in the last second
             mcp_server._service.engine.stop()
 
-    app = FastAPI(title="PoB2-Enhanced", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="PoB2-Enhanced", version=__version__, lifespan=lifespan)
     app.include_router(routes.router, prefix="/api")
 
     @app.exception_handler(EngineError)

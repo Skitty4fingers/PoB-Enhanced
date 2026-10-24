@@ -21,6 +21,21 @@ Nothing under `src/` is modified, so upstream updates merge cleanly.
 When the web UI and an agent use the same `pob2-web` process, they share one live build. The UI polls
 `/api/revision` and refreshes as the agent makes changes.
 
+## Versions
+
+The version number is in `python/pyproject.toml` (bump it there, plus the `pob2-enhanced` entry in
+`python/uv.lock`, and add a line to `docs/enhanced-changelog.md`). Images built with `scripts/build-image.sh` or by
+CI also carry the git commit and build time. The web UI shows `v<version> · <commit>` next to the title (hover it for
+the build time and upstream PoB version), and offers a reload when the server is updated while the page is open.
+`GET /api/version` returns the same, and MCP clients see the version in the server info.
+
+```bash
+IMAGE=192.168.1.147:5000/pob2-enhanced scripts/build-image.sh --push   # tags :latest and :<version>-<commit>
+scripts/check-deployed.sh http://truenas:8080                           # is the server on this checkout's commit?
+```
+
+A commit ending in `-dirty` means the image was built with uncommitted changes.
+
 ## Requirements
 
 - **LuaJIT from commit `2460b3ff` (2026-07-20) or newer.** PoB now uses LuaJIT's syntax extensions (`+=`, `..=`,
@@ -45,7 +60,7 @@ uv run --directory python pob2-web   # http://127.0.0.1:8080
 docker run -d -p 8080:8080 ghcr.io/skitty4fingers/pob-enhanced:latest   # prebuilt image (published by CI)
 docker compose -f compose.image.yml up -d                              # same, with Compose
 docker compose -f compose.enhanced.yml up -d --build                   # build from source
-docker build -f docker/enhanced.Dockerfile -t pob2-enhanced .
+scripts/build-image.sh                                                 # build from source, stamped with the commit
 docker run --rm -i pob2-enhanced pob2-mcp                              # MCP over stdio
 ```
 

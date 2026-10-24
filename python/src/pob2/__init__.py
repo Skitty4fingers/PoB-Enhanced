@@ -2,6 +2,6 @@
 
 from pob2.engine import Engine, EngineError
 from pob2.service import PoBService
+from pob2.version import __version__
 
-__all__ = ["Engine", "EngineError", "PoBService"]
-__version__ = "0.1.0"
+__all__ = ["Engine", "EngineError", "PoBService", "__version__"]

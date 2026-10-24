@@ -46,6 +46,17 @@ RUN uv sync --directory python --frozen --no-dev
 COPY patches/ patches/
 COPY library/ library/
 RUN python -m pob2.patches
+# Build identity, shown in the web UI header and at /api/version. scripts/build-image.sh fills these in;
+# declared last so a new commit doesn't invalidate the cached layers above.
+ARG GIT_COMMIT=""
+ARG BUILD_TIME=""
+ARG VERSION=""
+ENV POB2_COMMIT=$GIT_COMMIT \
+    POB2_BUILT=$BUILD_TIME
+LABEL org.opencontainers.image.title="PoB2-Enhanced" \
+      org.opencontainers.image.version=$VERSION \
+      org.opencontainers.image.revision=$GIT_COMMIT \
+      org.opencontainers.image.created=$BUILD_TIME
 USER pob
 # The current build and saved builds; mount a volume here to keep them across container updates.
 VOLUME /data

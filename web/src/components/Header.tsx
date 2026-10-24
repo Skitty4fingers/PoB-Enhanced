@@ -3,7 +3,7 @@ import { CircleHelp, Download, FilePlus2, Radio, RefreshCw, Search, Upload } fro
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useBuildMutation } from "../api/hooks";
-import type { BuildInfo, SourceInfo } from "../api/types";
+import type { BuildInfo, SourceInfo, VersionInfo } from "../api/types";
 import { ExportDialog, ImportDialog, NewBuildDialog } from "./BuildDialogs";
 import { BuildsButton, HistoryControls } from "./HistoryControls";
 import { LevelEditor } from "./LevelEditor";
@@ -44,6 +44,40 @@ function UpdateButton() {
   );
 }
 
+/** Server version and commit. Polled, so a redeploy while the page is open shows a reload prompt. */
+function VersionBadge() {
+  const { data } = useQuery({
+    queryKey: ["version"],
+    queryFn: () => api.get<VersionInfo>("/version"),
+    refetchInterval: 60000,
+  });
+  const [first, setFirst] = useState<string | null>(null);
+  const id = data ? `${data.version} ${data.commit ?? ""}` : null;
+  useEffect(() => {
+    if (id && first === null) setFirst(id);
+  }, [id, first]);
+  if (!data) return null;
+  const built = data.built ? new Date(data.built).toLocaleString() : "not recorded";
+  const title = [
+    `PoB2 Enhanced v${data.version}`,
+    `Commit ${data.commit ?? "unknown"}`,
+    `Built ${built}`,
+    data.upstream ? `Path of Building ${data.upstream}` : null,
+  ].filter(Boolean).join("\n");
+  if (first !== null && id !== first) {
+    return (
+      <button className="text-xs text-gold underline" onClick={() => window.location.reload()} title={title}>
+        Updated to v{data.version}: reload
+      </button>
+    );
+  }
+  return (
+    <span className="text-xs text-ink-400" title={title}>
+      v{data.version}{data.commit && <span className="hidden sm:inline"> · {data.commit}</span>}
+    </span>
+  );
+}
+
 export function Header({ info, revision }: { info?: BuildInfo; revision?: number }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const close = () => setDialog(null);
@@ -61,6 +95,7 @@ export function Header({ info, revision }: { info?: BuildInfo; revision?: number
       <div className="flex items-center gap-2">
         <div className="h-6 w-6 rounded-full border-[5px] border-gold bg-ink-950" />
         <span className="font-semibold tracking-wide text-gold-soft">PoB2 Enhanced</span>
+        <VersionBadge />
       </div>
       {info && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

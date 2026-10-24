@@ -588,6 +588,14 @@ export interface SourceInfo {
   loadedAt?: number;
 }
 
+/** What the server is running: package version, git commit ("-dirty" if built with uncommitted changes), build time. */
+export interface VersionInfo {
+  version: string;
+  commit: string | null;
+  built: string | null;
+  upstream: string | null;
+}
+
 // -- sockets (runes, soul cores, idols) -------------------------------------------------------------------
 
 export interface SocketDelta {
