@@ -332,6 +332,27 @@ def test_advisor_next_point_and_attributes(witch):
     assert entry["current"] == "Intelligence" and entry["reason"]
 
 
+def test_advisor_does_not_attach_normal_points_to_weapon_set_nodes(witch):
+    # In game a normal point can't connect through a weapon set node, so neither may an advised route.
+    hits = witch.call("tree.search", query="Raw Destruction")
+    target = next(n for n in hits if n["name"] == "Raw Destruction")
+    tree = witch.call("tree.allocate", ids=[target["id"]], weaponSet=1)
+    branch = {n["id"] for n in tree["nodes"] if n.get("weaponSet") == 1}
+    assert target["id"] in branch
+
+    def points(t):
+        return t["pointsUsed"] + t["ascendancyPointsUsed"]
+
+    for step in witch.advice()["steps"]:
+        before = points(witch.call("tree.get"))
+        after = witch.call("tree.allocate", ids=step["path"])
+        assert after["failed"] == []
+        # Pathing through the branch would convert it to normal points instead of adding only the step's nodes.
+        assert points(after) == before + step["points"]
+        assert {n["id"] for n in after["nodes"] if n.get("weaponSet") == 1} == branch
+        witch.call("tree.deallocate", ids=[step["path"][0]])
+
+
 def test_gear_advice(witch):
     witch.call("items.equip", text=WAND)
     slots = {s["slot"]: s for s in witch.gear_slots()}

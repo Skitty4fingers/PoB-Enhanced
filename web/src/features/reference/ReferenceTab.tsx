@@ -143,7 +143,8 @@ function Loaded({ summary }: { summary: ReferenceSummary }) {
     queryKey: ["reference-impact", level],
     queryFn: () => api.get<ReferenceImpact>(`/reference/impact${qs({ level, limit: 40 })}`),
   });
-  const allocate = useBuildMutation((ids: number[]) => api.post("/tree/allocate", { ids }));
+  const allocate = useBuildMutation(({ ids, weaponSet }: { ids: number[]; weaponSet?: number }) =>
+    api.post("/tree/allocate", { ids, weapon_set: weaponSet ?? 0 }));
   const deallocate = useBuildMutation((ids: number[]) => api.post("/tree/deallocate", { ids }));
   const applyTree = useBuildMutation(() => api.post(`/reference/apply-tree${qs({ level })}`));
   const clear = async () => {
@@ -225,7 +226,7 @@ function Loaded({ summary }: { summary: ReferenceSummary }) {
           rows={i?.steps ?? []}
           empty={impact.isLoading ? "Calculating…" : "You have every guide notable reachable from your tree."}
           action={(r) => (
-            <button className="btn" disabled={allocate.isPending} onClick={() => r.path && allocate.mutate(r.path)} title="Allocate this node and its path">
+            <button className="btn" disabled={allocate.isPending} onClick={() => r.path && allocate.mutate({ ids: r.path, weaponSet: r.weaponSet })} title="Allocate this node and its path">
               <Plus size={13} /> Allocate
             </button>
           )}

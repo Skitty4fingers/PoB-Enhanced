@@ -341,13 +341,18 @@ local function pct(before, after)
 end
 
 -- Shortest route from the current allocation to `target` that only uses reference nodes.
-local function routeTo(target, missingSet)
+-- allocMode: 0 for a normal point, 1 or 2 for a weapon set point. As in game, a normal point can't attach to a
+-- weapon set node, and a weapon set point can attach to normal nodes or its own set only.
+local function routeTo(target, missingSet, allocMode)
+	allocMode = allocMode or 0
 	local prev, queue, head = { [target] = false }, { target }, 1
 	while head <= #queue do
 		local node = queue[head]
 		head = head + 1
 		for _, other in ipairs(node.linked or { }) do
-			if other.alloc and (not other.ascendancyName or other.ascendancyName == node.ascendancyName) then
+			local otherMode = other.allocMode or 0
+			if other.alloc and (otherMode == 0 or otherMode == allocMode)
+				and (not other.ascendancyName or other.ascendancyName == node.ascendancyName) then
 				local path, cur = { }, node
 				while cur do
 					path[#path + 1] = cur
@@ -370,7 +375,7 @@ function M.impact(params)
 	local spec = b.spec
 	level = level or b.characterLevel
 	local limit = tonumber(params.limit) or 40
-	local wanted = resolvePassives(spec, ref, level)
+	local wanted, weaponSets = resolvePassives(spec, ref, level)
 	local calcFunc, baseOutput = b.calcsTab:GetMiscCalculator()
 	local base = headline(baseOutput)
 
@@ -411,7 +416,7 @@ function M.impact(params)
 	local steps = util.array()
 	for node in pairs(missingSet) do
 		if node.type == "Notable" or node.type == "Keystone" or node.type == "Socket" then
-			local path = routeTo(node, missingSet)
+			local path = routeTo(node, missingSet, weaponSets[node])
 			if path then
 				-- path[1] touches the current tree; path[#path] is the target.
 				local set, ids = { }, util.array()
@@ -421,6 +426,7 @@ function M.impact(params)
 				end
 				local row = summarise(calcFunc({ addNodes = set }), #path)
 				row.id, row.name, row.type, row.ascendancy, row.path = node.id, node.dn, node.type, node.ascendancyName, ids
+				row.weaponSet = weaponSets[node] > 0 and weaponSets[node] or nil
 				row.score = (row.dpsPercent + row.ehpPercent) / #path
 				steps[#steps + 1] = row
 			end

@@ -354,9 +354,13 @@ def compare_passives(add: NodeIds | None = None, remove: NodeIds | None = None) 
 
 
 @tool(WRITE)
-def allocate_passives(ids: NodeIds) -> dict[str, Any]:
-    """Allocate nodes, pathing through the shortest route. Unreachable ids are listed in 'failed'."""
-    return svc().call("tree.allocate", ids=ids)
+def allocate_passives(
+    ids: NodeIds,
+    weapon_set: Annotated[int, Field(ge=0, le=2, description="0 normal points, 1 or 2 weapon set points")] = 0,
+) -> dict[str, Any]:
+    """Allocate nodes, pathing through the shortest route. Unreachable ids are listed in 'failed'.
+    Use the weaponSet that get_advice reports for a step."""
+    return svc().call("tree.allocate", ids=ids, weaponSet=weapon_set)
 
 
 @tool(WRITE)

@@ -24,7 +24,8 @@ export function AdvisorPanel({
 }) {
   const [open, setOpen] = useState(true);
   const [showAttrs, setShowAttrs] = useState(false);
-  const allocate = useBuildMutation((ids: number[]) => api.post("/tree/allocate", { ids }));
+  const allocate = useBuildMutation(({ ids, weaponSet }: { ids: number[]; weaponSet?: number }) =>
+    api.post("/tree/allocate", { ids, weapon_set: weaponSet ?? 0 }));
   const refund = useBuildMutation((id: number) => api.post("/tree/deallocate", { ids: [id] }));
   const attrs = useBuildMutation((changes: { id: number; attribute: string }[]) => api.post("/tree/attributes", { changes }));
   const busy = allocate.isPending || refund.isPending || attrs.isPending;
@@ -67,11 +68,11 @@ export function AdvisorPanel({
                   {next.first.id !== next.target.id && <span className="text-ink-400"> → {next.target.name}</span>}
                 </div>
                 <div className="text-xs text-ink-400">
-                  {next.points} pt{next.points === 1 ? "" : "s"} · {pct(next.dpsPercent)} DPS · {pct(next.ehpPercent)} EHP
+                  {next.points} {next.weaponSet ? `weapon set ${next.weaponSet} ` : ""}pt{next.points === 1 ? "" : "s"} · {pct(next.dpsPercent)} DPS · {pct(next.ehpPercent)} EHP
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  <button className="btn btn-primary" disabled={busy} onClick={() => allocate.mutate([next.first.id])}>Allocate next point</button>
-                  {next.points > 1 && <button className="btn" disabled={busy} onClick={() => allocate.mutate(next.path)}>All {next.points}</button>}
+                  <button className="btn btn-primary" disabled={busy} onClick={() => allocate.mutate({ ids: [next.first.id], weaponSet: next.weaponSet })}>Allocate next point</button>
+                  {next.points > 1 && <button className="btn" disabled={busy} onClick={() => allocate.mutate({ ids: next.path, weaponSet: next.weaponSet })}>All {next.points}</button>}
                   <button className="btn" onClick={() => onShow(next.first.id)} title="Show on tree"><Crosshair size={13} /></button>
                 </div>
               </div>

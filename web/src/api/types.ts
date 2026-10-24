@@ -405,6 +405,8 @@ export interface ImpactStep extends ImpactSummary {
   ascendancy?: string;
   path?: number[];
   score?: number;
+  /** Set when the guide takes this node with weapon set points (1 or 2). */
+  weaponSet?: number;
 }
 
 export interface ReferenceImpact {
@@ -426,6 +428,8 @@ export interface AdviceStep extends ImpactSummary {
   path: number[];
   reason?: string;
   inGuide: boolean;
+  /** Set when the step spends weapon set points (1 or 2) rather than normal points. */
+  weaponSet?: number;
 }
 
 export interface AdviceRefund extends ImpactSummary {

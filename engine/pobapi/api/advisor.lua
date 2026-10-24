@@ -45,12 +45,12 @@ local function refundEffect(r)
 	return "refunding it costs " .. describe(loss):gsub("%+", "")
 end
 
--- Nodes in `set` ordered so each touches the tree (or an earlier one) when allocated.
+-- Nodes in `set` ordered so each touches the tree (or an earlier one) when allocated with normal points.
 local function allocationOrder(set)
 	local order, seen, queue, head = { }, { }, { }, 1
 	for node in pairs(set) do
 		for _, other in ipairs(node.linked or { }) do
-			if other.alloc and not set[other] and not seen[node]
+			if other.alloc and (other.allocMode or 0) == 0 and not set[other] and not seen[node]
 				and (not other.ascendancyName or other.ascendancyName == node.ascendancyName) then
 				seen[node] = true
 				queue[#queue + 1] = node
@@ -94,13 +94,13 @@ function M.plan(params)
 	end
 
 	local guide, level
-	local wanted = { }
+	local wanted, weaponSets = { }, { }
 	if type(params.reference) == "table" then
 		local ref
 		ref, level = reference._getReference(params)
 		level = level or b.characterLevel
 		guide = { name = ref.name, level = level }
-		wanted = reference._resolvePassives(spec, ref, level)
+		wanted, weaponSets = reference._resolvePassives(spec, ref, level)
 	end
 
 	local granted = { }
@@ -119,19 +119,26 @@ function M.plan(params)
 		end
 		for node in pairs(missing) do
 			if node.type == "Notable" or node.type == "Keystone" or node.type == "Socket" then
-				local path = reference._routeTo(node, missing)
+				local path = reference._routeTo(node, missing, weaponSets[node])
 				if path then
-					candidates[#candidates + 1] = { target = node, path = path }
+					candidates[#candidates + 1] = { target = node, path = path, weaponSet = weaponSets[node] }
 				end
 			end
 		end
 	else
 		local maxPath = tonumber(params.maxPath) or 8
 		for _, node in pairs(spec.nodes) do
-			if not node.alloc and (node.type == "Notable" or node.type == "Keystone") and node.path and #node.path > 0
-				and #node.path <= maxPath and (not node.ascendancyName or node.ascendancyName == spec.curAscendClassName) then
+			local path = node.path
+			-- PoB paths may start from a weapon set node, which a normal point can't attach to in game.
+			-- The normal-only route is never shorter, so only look for it when the PoB path is in range.
+			if not node.alloc and (node.type == "Notable" or node.type == "Keystone") and path and #path > 0 and #path <= maxPath
+				and node.pathRoot and (node.pathRoot.allocMode or 0) > 0 then
+				path = spec:GetAllocationPath(node, 0)
+			end
+			if not node.alloc and (node.type == "Notable" or node.type == "Keystone") and path and #path > 0
+				and #path <= maxPath and (not node.ascendancyName or node.ascendancyName == spec.curAscendClassName) then
 				local set = { }
-				for _, pathNode in ipairs(node.path) do
+				for _, pathNode in ipairs(path) do
 					set[pathNode] = true
 				end
 				candidates[#candidates + 1] = { target = node, path = allocationOrder(set) }
@@ -156,6 +163,7 @@ function M.plan(params)
 		r.path = ids
 		r.first = nodeRef(cand.path[1])
 		r.inGuide = guide ~= nil
+		r.weaponSet = (cand.weaponSet or 0) > 0 and cand.weaponSet or nil
 		if guide or r.score >= MIN_GAIN then
 			steps[#steps + 1] = r
 		end
@@ -170,6 +178,7 @@ function M.plan(params)
 			local r = measure({ removeNodes = { [node] = true } }, 1)
 			r.node = nodeRef(node)
 			r.notInGuide = guide ~= nil
+			r.weaponSet = (node.allocMode or 0) > 0 and node.allocMode or nil
 			r.reason = (guide and ((node.dn or "This node") .. " isn't in the guide; ") or ((node.dn or "This node") .. ": "))
 				.. refundEffect(r) .. "."
 			refunds[#refunds + 1] = r
@@ -179,7 +188,14 @@ function M.plan(params)
 
 	local nextStep = steps[1]
 	local move
-	local refund = refunds[1]
+	-- Weapon set points are a separate pool, so only move a point within the same pool.
+	local refund
+	for _, r in ipairs(refunds) do
+		if nextStep and r.weaponSet == nextStep.weaponSet then
+			refund = r
+			break
+		end
+	end
 	if nextStep and refund then
 		local net = nextStep.perPoint + refund.score
 		if guide or net >= MIN_GAIN then
@@ -190,8 +206,9 @@ function M.plan(params)
 		end
 	end
 	if nextStep then
-		nextStep.reason = string.format("First point toward %s (%d point%s): %s in total.", nextStep.target.name,
-			nextStep.points, nextStep.points == 1 and "" or "s", describe(nextStep))
+		nextStep.reason = string.format("First point toward %s (%d %spoint%s): %s in total.", nextStep.target.name,
+			nextStep.points, nextStep.weaponSet and ("weapon set " .. nextStep.weaponSet .. " ") or "",
+			nextStep.points == 1 and "" or "s", describe(nextStep))
 	end
 	while #steps > limit do table.remove(steps) end
 	while #refunds > limit do table.remove(refunds) end

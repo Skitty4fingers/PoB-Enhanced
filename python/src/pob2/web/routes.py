@@ -58,6 +58,10 @@ class NodeIds(BaseModel):
     ids: list[int]
 
 
+class NodeAllocation(NodeIds):
+    weapon_set: int = Field(0, ge=0, le=2)
+
+
 class NodeCompare(BaseModel):
     add: list[int] | None = None
     remove: list[int] | None = None
@@ -354,8 +358,8 @@ def tree_node(node_id: int) -> Any:
 
 
 @router.post("/tree/allocate")
-def allocate(body: NodeIds) -> Any:
-    return svc().call("tree.allocate", ids=body.ids)
+def allocate(body: NodeAllocation) -> Any:
+    return svc().call("tree.allocate", ids=body.ids, weaponSet=body.weapon_set)
 
 
 @router.post("/tree/deallocate")

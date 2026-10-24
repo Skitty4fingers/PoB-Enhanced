@@ -13,6 +13,7 @@ local function nodeInfo(node, withStats)
 		ascendancy = node.ascendancyName,
 		allocated = node.alloc or false,
 		isAttribute = node.isAttribute or nil,
+		weaponSet = (node.allocMode or 0) > 0 and node.allocMode or nil,
 	}
 	if withStats then
 		res.stats = util.array()
@@ -100,9 +101,12 @@ local function eachNode(params)
 	return spec, list
 end
 
+-- params.weaponSet: 1 or 2 spends weapon set points; default normal points.
 function M.allocate(params)
 	local spec, list = eachNode(params)
 	local failed = util.array()
+	local prevMode = spec.allocMode
+	spec.allocMode = tonumber(params.weaponSet) or 0
 	for _, node in ipairs(list) do
 		if not node.alloc then
 			spec:AllocNode(node)
@@ -111,6 +115,7 @@ function M.allocate(params)
 			end
 		end
 	end
+	spec.allocMode = prevMode
 	session.recalc()
 	local res = M.get()
 	res.failed = failed
