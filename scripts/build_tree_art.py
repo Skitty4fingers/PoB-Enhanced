@@ -3,7 +3,8 @@
     uv run --no-project --with zstandard --with texture2ddecoder --with pillow \
         python scripts/build_tree_art.py --out tree-art
 
-Reads src/TreeData/<version>/tree.lua's ``ddsCoords`` (atlas file -> {asset name: layer index}) and writes
+Reads src/TreeData/<version>/tree.lua's ``ddsCoords`` (atlas file -> {asset name: layer index, or
+{x, y, w, h, layer} for images padded inside their layer}) and writes
 ``<out>/<version>/manifest.json`` plus one WebP sprite sheet per small atlas or one WebP per layer for large
 ones. Only atlases referenced by ``ddsCoords`` are converted. Defaults to the latest tree version.
 """
@@ -29,13 +30,22 @@ SHEET_MAX_SIDE = 256  # layers up to this size are packed into a sprite sheet
 MAX_FILE_SIDE = 2048  # larger layers are downscaled (PoB draws them at 2x anyway)
 
 ATLAS_RE = re.compile(r'^\t\t\["(.+?)"\]=\{\s*$')
-ENTRY_RE = re.compile(r'^\t\t\t(?:\["(.+?)"\]|([A-Za-z_][A-Za-z0-9_]*))=(\d+),?\s*$')
+NAME = r'(?:\["(.+?)"\]|([A-Za-z_][A-Za-z0-9_]*))'
+ENTRY_RE = re.compile(r"^\t\t\t" + NAME + r"=(\d+),?\s*$")
+RECT_START_RE = re.compile(r"^\t\t\t" + NAME + r"=\{\s*$")
+RECT_VALUE_RE = re.compile(r"^\t\t\t\t\[\d\]=(\d+),?\s*$")
+
+Rect = tuple[int, int, int, int]
 
 
-def parse_dds_coords(tree_lua: Path) -> dict[str, dict[str, int]]:
+def parse_dds_coords(tree_lua: Path) -> tuple[dict[str, dict[str, int]], dict[str, set[Rect]]]:
+    """Asset layers per atlas, plus the crop rectangles (x, y, w, h) of entries in the padded format."""
     coords: dict[str, dict[str, int]] = {}
+    rects: dict[str, set[Rect]] = {}
     inside = False
-    current: dict[str, int] | None = None
+    atlas: str | None = None
+    rect_name: str | None = None
+    values: list[int] = []
     with tree_lua.open(encoding="utf-8") as f:
         for line in f:
             if not inside:
@@ -43,11 +53,22 @@ def parse_dds_coords(tree_lua: Path) -> dict[str, dict[str, int]]:
                 continue
             if line.startswith("\t}"):
                 break
-            if m := ATLAS_RE.match(line):
-                current = coords.setdefault(m.group(1), {})
-            elif current is not None and (m := ENTRY_RE.match(line)):
-                current[m.group(1) or m.group(2)] = int(m.group(3))
-    return coords
+            if rect_name is not None:
+                if m := RECT_VALUE_RE.match(line):
+                    values.append(int(m.group(1)))
+                elif line.startswith("\t\t\t}") and atlas is not None:
+                    x, y, w, h, layer = values
+                    coords[atlas][rect_name] = layer
+                    rects.setdefault(atlas, set()).add((x, y, w, h))
+                    rect_name = None
+            elif m := ATLAS_RE.match(line):
+                atlas = m.group(1)
+                coords.setdefault(atlas, {})
+            elif atlas is not None and (m := ENTRY_RE.match(line)):
+                coords[atlas][m.group(1) or m.group(2)] = int(m.group(3))
+            elif atlas is not None and (m := RECT_START_RE.match(line)):
+                rect_name, values = m.group(1) or m.group(2), []
+    return coords, rects
 
 
 def latest_version(root: Path) -> str:
@@ -101,7 +122,7 @@ def read_layers(path: Path, wanted: set[int] | None) -> tuple[int, int, dict[int
 
 def convert_version(root: Path, version: str, out: Path) -> None:
     tree_dir = root / "src" / "TreeData" / version
-    coords = parse_dds_coords(tree_dir / "tree.lua")
+    coords, rects = parse_dds_coords(tree_dir / "tree.lua")
     if not coords:
         sys.exit(f"No ddsCoords in {tree_dir / 'tree.lua'}")
     dest = out / version
@@ -116,6 +137,13 @@ def convert_version(root: Path, version: str, out: Path) -> None:
         atlas_id = file.removesuffix(".dds.zst")
         small = max(int(n) for n in re.findall(r"_(\d+)_(\d+)_", file)[0]) <= SHEET_MAX_SIDE
         w, h, images = read_layers(src, None if small else set(entries.values()))
+        # Padded atlases put every image at the same spot in its layer; crop so the web UI sees plain layers.
+        if crop := rects.get(file):
+            if len(crop) > 1:
+                sys.exit(f"{file}: assets use different crop rectangles {sorted(crop)}; not supported")
+            x, y, cw, ch = next(iter(crop))
+            images = {index: img.crop((x, y, x + cw, y + ch)) for index, img in images.items()}
+            w, h = cw, ch
         info: dict = {"w": w, "h": h}
         if small:
             count = max(images)
