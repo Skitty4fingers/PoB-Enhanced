@@ -35,6 +35,8 @@ WORKDIR /app
 COPY python/pyproject.toml python/uv.lock python/README.md python/
 RUN uv sync --directory python --frozen --no-dev --no-install-project
 COPY --chown=pob src/ src/
+# Upstream PoB version, reported at /api/version.
+COPY manifest.xml ./
 # PoE2 tree artwork, pre-converted to WebP (regenerate with scripts/build_tree_art.py when TreeData changes).
 COPY tree-art/ tree-art/
 COPY runtime/lua/ runtime/lua/
