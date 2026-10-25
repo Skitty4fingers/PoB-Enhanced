@@ -95,6 +95,11 @@ Notes:
 - Every tailnet member who can reach the node shares the one active build. Use `TS_EXTRA_ARGS=--advertise-tags=tag:pob2`
   and an ACL rule to limit who can reach it.
 - Funnel (public internet exposure) is explicitly disabled in `docker/tailscale/serve.json`.
+- To put an already running server (e.g. a NAS app) on the internet with Funnel instead, build
+  `docker/tailscale/funnel.Dockerfile` with `--build-arg TARGET=http://<server>:8080` and run it as its own container
+  with a persistent `TS_STATE_DIR`. It needs HTTPS certificates and the `funnel` node attribute in your tailnet policy,
+  and the server needs `pob2.<tailnet>.ts.net` in `POB2_ALLOWED_HOSTS`. Anyone with the link can then open any
+  [workspace](#workspaces).
 - `/mcp` rejects Host headers it doesn't know (DNS-rebinding protection). The compose file sets
   `POB2_ALLOWED_HOSTS` to the tailnet name. Set it yourself for any other reverse proxy.
 
