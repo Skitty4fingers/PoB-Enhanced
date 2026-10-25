@@ -8,6 +8,7 @@ import { ExportDialog, ImportDialog, NewBuildDialog } from "./BuildDialogs";
 import { BuildsButton, HistoryControls } from "./HistoryControls";
 import { LevelEditor } from "./LevelEditor";
 import { ThemePicker } from "./ThemeControls";
+import { WorkspaceChip } from "./WorkspaceControls";
 
 type Dialog = "import" | "export" | "new" | null;
 
@@ -97,6 +98,7 @@ export function Header({ info, revision }: { info?: BuildInfo; revision?: number
         <div className="h-6 w-6 rounded-full border-[5px] border-gold bg-ink-950" />
         <span className="font-semibold tracking-wide text-gold-soft">PoB2 Enhanced</span>
         <VersionBadge />
+        <WorkspaceChip />
       </div>
       {info && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">

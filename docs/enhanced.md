@@ -18,7 +18,7 @@ Nothing under `src/` is modified, so upstream updates merge cleanly.
  Scripts ──pob2 CLI ─────────────┘   (python)      (process, JSON lines)
 ```
 
-When the web UI and an agent use the same `pob2-web` process, they share one live build. The UI polls
+When the web UI and an agent use the same `pob2-web` process and [workspace](#workspaces), they share one live build. The UI polls
 `/api/revision` and refreshes as the agent makes changes.
 
 ## Versions
@@ -107,6 +107,8 @@ Notes:
 | `POB2_ALLOWED_HOSTS` | (none) | Extra hostnames accepted by `/mcp`, comma-separated (localhost is always allowed) |
 | `POB2_TREE_ART` | `<repo>/tree-art` | Passive tree artwork served at `/tree-art` (see below) |
 | `POB2_DATA` | `/data` (Docker), `~/.local/share/pob2`, `%LOCALAPPDATA%\pob2` | Current build (restored at start), saved builds, guide, item art |
+| `POB2_MAX_WORKERS` | `4` | PoB worker processes running at once (one per active [workspace](#workspaces)) |
+| `POB2_IDLE_MINUTES` | `20` | Stop a workspace's worker after this long without requests (`0` never does) |
 
 ### Passive tree artwork
 
@@ -121,6 +123,26 @@ uv run --no-project --with zstandard --with texture2ddecoder --with pillow pytho
 Without the artwork the tree falls back to plain circles. Tree links use the official PoE2 planner format
 (`https://pathofexile2.com/game/passive-skill-tree/<code>`, version 7), including weapon-set and attribute choices.
 
+## Workspaces
+
+Several people can use one server without logging in: each workspace is a name in the URL with its own live build,
+undo history, guide, compare build and saved builds.
+
+- Web UI: `http://<host>:8080/w/<name>`. `/` opens the last workspace used in that browser, or asks for a name.
+  The workspace chip in the header copies the link and the MCP URL, and switches to another name.
+- MCP: `http://<host>:8080/w/<name>/mcp` (or `/mcp?w=<name>`). The agent then edits the same build as that page.
+- REST: send `X-PoB-Workspace: <name>` (or `?w=<name>`); `GET /api/workspace` echoes it.
+- Names are 1-32 lowercase letters, digits and dashes. Plain `/mcp` and requests without a name use `default`, the
+  build that was there before workspaces existed.
+
+There is no access control: anyone who knows a name can open and change that build. Pick unguessable names
+(the UI suggests ones like `amber-falcon-42`) if that matters, and keep the server off the public internet.
+
+Each active workspace has its own PoB worker process. When `POB2_MAX_WORKERS` are running, opening another one
+hibernates the least recently used (its build is saved and the worker stopped; undo history stays in memory), and
+any workspace idle for `POB2_IDLE_MINUTES` hibernates too. The next request reloads it, which takes a few seconds.
+`pob2-mcp` (stdio) and the CLI always use `default`.
+
 ## Connecting AI agents (MCP)
 
 **Claude Code:** this repo ships `.mcp.json`, so Claude Code offers the `pob2` server automatically in the repo.
@@ -129,6 +151,7 @@ Elsewhere:
 ```bash
 claude mcp add pob2 -- uv run --directory /path/to/PoB-Enhanced/python pob2-mcp
 claude mcp add --transport http pob2 http://127.0.0.1:8080/mcp     # share the web UI's live build
+claude mcp add --transport http pob2 http://127.0.0.1:8080/w/scott/mcp   # ... of workspace "scott"
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`):
@@ -229,7 +252,8 @@ stage. The reference is kept in memory until replaced or the server restarts.
 
 The web server and MCP server keep their state in `POB2_DATA`: `current.json` (the live build, written a second
 after each change and restored at start-up), `reference.json` (the loaded guide), `builds/` (named saved builds) and
-`art.json` (item icons learned from poe.ninja). The Docker image declares `/data` as a volume; mount one to keep it
+`art.json` (item icons learned from poe.ninja). That is the `default` workspace; every other workspace keeps its own
+`current.json`, `reference.json` and `builds/` in `workspaces/<name>/`. The Docker image declares `/data` as a volume; mount one to keep it
 across updates. The CLI and tests keep everything in memory.
 
 Every build-changing call, from the UI or an agent, first snapshots the build (PoB XML plus where it came from), so

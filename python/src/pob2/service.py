@@ -7,7 +7,7 @@ import json
 import logging
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -45,6 +45,10 @@ MAX_REFERENCE_BYTES = 2_000_000
 
 # Undo history kept in memory (each entry is one build XML, typically 20-60 KB).
 HISTORY_LIMIT = 40
+
+# Passive tree geometry by tree version; static, so shared by every workspace.
+_layout_cache: dict[str, Any] = {}
+_layout_lock = threading.Lock()
 
 # Readable labels for undo entries.
 LABELS = {
@@ -105,8 +109,12 @@ class PoBService:
         self.compare_source: str | None = None
         self.art = ArtStore(store.root / "art.json" if store else None)
         self.revision = 0
-        self._layout_cache: dict[str, Any] = {}
         self._lock = threading.RLock()
+        # Held across each engine call and each multi-call operation, so clients sharing this build (two tabs, the
+        # UI and an agent) don't interleave half-finished changes. Always taken before `_lock`, never after.
+        self._busy = threading.RLock()
+        self._asleep = False  # worker stopped by hibernate(); the next engine call reloads the saved build
+        self.before_start: Callable[[], None] | None = None  # called before the worker starts (frees another one)
         # Reference build (PoE2 BuildPlanner .build JSON) the live build is compared against.
         self.reference: dict[str, Any] | None = None
         self._advice_cache: tuple[tuple[Any, ...], dict[str, Any]] | None = None
@@ -118,28 +126,60 @@ class PoBService:
 
     def call(self, method: str, **params: Any) -> Any:
         mutating = method in MUTATING or (method == "config.custom_mods" and params.get("text") is not None)
-        if mutating and not self._restoring and self._depth == 0:
-            self._record(LABELS.get(method, method))
-        result = self.engine.call(method, {k: v for k, v in params.items() if v is not None})
-        if mutating:
-            self.revision += 1
-            self._schedule_save()
+        with self._busy:
+            self._wake()
+            if mutating and not self._restoring and self._depth == 0:
+                self._record(LABELS.get(method, method))
+            result = self.engine.call(method, {k: v for k, v in params.items() if v is not None})
+            if mutating:
+                self.revision += 1
+                self._schedule_save()
         return result
+
+    # -- hibernation (see pob2.workspaces) --------------------------------------------------------
+
+    def hibernate(self) -> bool:
+        """Save the build and stop the worker to free its memory; undo history and guide stay in memory."""
+        with self._busy:
+            if not self.engine.running or self.store is None:
+                return False
+            with self._lock:
+                if self._save_timer is not None:
+                    self._save_timer.cancel()
+            self.save_now()
+            self.engine.stop()
+            self._asleep = True
+            return True
+
+    def _wake(self) -> None:
+        """Called (under `_busy`) before anything that may start the worker."""
+        if self.engine.running:
+            return
+        if self.before_start is not None:
+            self.before_start()
+        if not self._asleep:
+            return
+        self._asleep = False
+        state = self.store.load_current() if self.store else None
+        if state:
+            self.engine.call("build.load_xml", {"xml": state["xml"], "name": state.get("name")})
 
     # -- history (undo / redo) --------------------------------------------------------------------
 
     @contextlib.contextmanager
     def operation(self, label: str) -> Iterator[None]:
         """Group several changes into one undo step."""
-        if self._depth == 0 and not self._restoring:
-            self._record(label)
-        self._depth += 1
-        try:
-            yield
-        finally:
-            self._depth -= 1
+        with self._busy:
+            if self._depth == 0 and not self._restoring:
+                self._record(label)
+            self._depth += 1
+            try:
+                yield
+            finally:
+                self._depth -= 1
 
     def _capture(self, label: str) -> Snapshot | None:
+        self._wake()
         try:
             xml = self.engine.call("build.export_xml")["xml"]
             name = self.engine.call("build.info").get("name")
@@ -149,6 +189,7 @@ class PoBService:
         return Snapshot(label, xml, name, self.source, self.source_league, self.source_loaded_at, id=self._snapshot_ids)
 
     def _record(self, label: str) -> None:
+        self._wake()
         if not self.engine.running:
             return  # first call ever: there is no build to go back to
         snap = self._capture(label)
@@ -176,40 +217,44 @@ class PoBService:
         }
 
     def undo(self) -> dict[str, Any]:
-        with self._lock:
-            if not self._undo:
-                raise ValueError("Nothing to undo")
-            snap = self._undo.pop()
-        current = self._capture(snap.label)
-        info = self._restore(snap)
-        if current:
-            self._redo.append(current)
-        return {"undid": snap.label, "info": info, **self.history()}
+        with self._busy:
+            with self._lock:
+                if not self._undo:
+                    raise ValueError("Nothing to undo")
+                snap = self._undo.pop()
+            current = self._capture(snap.label)
+            info = self._restore(snap)
+            if current:
+                self._redo.append(current)
+            return {"undid": snap.label, "info": info, **self.history()}
 
     def redo(self) -> dict[str, Any]:
-        with self._lock:
-            if not self._redo:
-                raise ValueError("Nothing to redo")
-            snap = self._redo.pop()
-        current = self._capture(snap.label)
-        info = self._restore(snap)
-        if current:
-            self._undo.append(current)
-        return {"redid": snap.label, "info": info, **self.history()}
+        with self._busy:
+            with self._lock:
+                if not self._redo:
+                    raise ValueError("Nothing to redo")
+                snap = self._redo.pop()
+            current = self._capture(snap.label)
+            info = self._restore(snap)
+            if current:
+                self._undo.append(current)
+            return {"redid": snap.label, "info": info, **self.history()}
 
     def restore_history(self, entry_id: int) -> dict[str, Any]:
         """Go back to the build as it was before undo entry `entry_id` (itself undoable)."""
-        with self._lock:
-            snap = next((s for s in self._undo if s.id == entry_id), None)
-        if snap is None:
-            raise ValueError(f"No undo entry {entry_id}")
-        self._record(f"Before going back to: {snap.label}")
-        info = self._restore(snap)
-        return {"restored": snap.label, "info": info, **self.history()}
+        with self._busy:
+            with self._lock:
+                snap = next((s for s in self._undo if s.id == entry_id), None)
+            if snap is None:
+                raise ValueError(f"No undo entry {entry_id}")
+            self._record(f"Before going back to: {snap.label}")
+            info = self._restore(snap)
+            return {"restored": snap.label, "info": info, **self.history()}
 
     def checkpoint(self, label: str) -> dict[str, Any]:
         """Add a named undo entry for the build as it is now, to come back to after experimenting."""
-        self._record(label.strip() or "Checkpoint")
+        with self._busy:
+            self._record(label.strip() or "Checkpoint")
         return self.history()
 
     # -- persistence ------------------------------------------------------------------------------
@@ -223,6 +268,7 @@ class PoBService:
         state = self.store.load_current()
         if not state:
             return False
+        self._asleep = False
         self._restoring = True
         try:
             self.call("build.load_xml", xml=state["xml"], name=state.get("name"))
@@ -250,19 +296,22 @@ class PoBService:
         """Write the current build to the data folder (normally done 1 s after each change)."""
         if self.store is None:
             return
-        try:
-            xml = self.engine.call("build.export_xml")["xml"]
-            name = self.engine.call("build.info").get("name")
-            state = {
-                "xml": xml,
-                "name": name,
-                "source": self.source,
-                "league": self.source_league,
-                "loadedAt": self.source_loaded_at,
-            }
-            self.store.save_current(state)
-        except (EngineError, OSError):
-            log.exception("Could not save the current build")
+        with self._busy:
+            if not self.engine.running:
+                return  # hibernated or never started: what's on disk is already current
+            try:
+                xml = self.engine.call("build.export_xml")["xml"]
+                name = self.engine.call("build.info").get("name")
+                state = {
+                    "xml": xml,
+                    "name": name,
+                    "source": self.source,
+                    "league": self.source_league,
+                    "loadedAt": self.source_loaded_at,
+                }
+                self.store.save_current(state)
+            except (EngineError, OSError):
+                log.exception("Could not save the current build")
 
     # -- saved builds -----------------------------------------------------------------------------
 
@@ -441,9 +490,7 @@ class PoBService:
         if xml is None:
             return None
         key = ("compare", hash(xml))
-        return self._memoised(
-            key, lambda: _diff(self.engine.call("compare.collect", {"xml": xml}), self.compare_source)
-        )
+        return self._memoised(key, lambda: _diff(self.call("compare.collect", xml=xml), self.compare_source))
 
     def copy_from_compare(self, what: str, slot: str | None = None) -> dict[str, Any]:
         """Copy the compared build's tree, config, or the item in `slot` into the live build (undoable)."""
@@ -707,12 +754,12 @@ class PoBService:
         """Static node geometry (cached per tree version) plus the current allocation."""
         info = self.info()
         version = info["treeVersion"]
-        with self._lock:
-            if version not in self._layout_cache:
-                layout = self.call("tree.layout")
-                for node in layout["nodes"]:
-                    node.pop("alloc", None)
-                self._layout_cache[version] = layout
+        if version not in _layout_cache:
+            layout = self.call("tree.layout")
+            for node in layout["nodes"]:
+                node.pop("alloc", None)
+            with _layout_lock:
+                _layout_cache[version] = layout
         tree = self.call("tree.get")
         allocated = [n["id"] for n in tree["nodes"]]
         # Chosen +5 attribute on allocated attribute nodes (Strength/Dexterity/Intelligence).
@@ -725,7 +772,7 @@ class PoBService:
             if i.get("jewelNodeId") and i.get("item")
         }
         return {
-            **self._layout_cache[version],
+            **_layout_cache[version],
             "allocated": allocated,
             "jewels": jewels,
             "attributes": attributes,

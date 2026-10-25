@@ -10,6 +10,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -42,6 +43,7 @@ class BuildStore:
     def __init__(self, root: Path | None = None):
         self.root = Path(root) if root else default_dir()
         self.builds = self.root / "builds"
+        self._index_lock = threading.Lock()  # index.json is read-modify-write
 
     # -- current build --------------------------------------------------------------------------
 
@@ -87,6 +89,10 @@ class BuildStore:
 
     def save(self, name: str, xml: str, meta: dict[str, Any], build_id: str | None = None) -> dict[str, Any]:
         name = name.strip() or "Unnamed build"
+        with self._index_lock:
+            return self._save(name, xml, meta, build_id)
+
+    def _save(self, name: str, xml: str, meta: dict[str, Any], build_id: str | None) -> dict[str, Any]:
         index = self._index()
         if build_id is None:
             # Saving under an existing name overwrites it, like a file.
@@ -108,9 +114,10 @@ class BuildStore:
         return meta, (self.builds / f"{build_id}.xml").read_text(encoding="utf-8")
 
     def delete(self, build_id: str) -> None:
-        index = self._index()
-        if build_id not in index:
-            raise KeyError(build_id)
-        del index[build_id]
-        self._write_index(index)
+        with self._index_lock:
+            index = self._index()
+            if build_id not in index:
+                raise KeyError(build_id)
+            del index[build_id]
+            self._write_index(index)
         (self.builds / f"{build_id}.xml").unlink(missing_ok=True)

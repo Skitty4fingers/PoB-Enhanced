@@ -7,13 +7,14 @@ from typing import Any, Literal
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
-from pob2 import mcp_server
+from pob2 import mcp_server, workspaces
+from pob2.engine import find_repo_root
 from pob2.version import build_info
 
 router = APIRouter()
 
 
-def svc():  # noqa: ANN201 - shared with the MCP server so both see the same build
+def svc():  # noqa: ANN201 - shared with the MCP server so both see the same build (per workspace)
     return mcp_server.svc()
 
 
@@ -110,14 +111,21 @@ class ReferenceUpload(BaseModel):
 
 @router.get("/health")
 def health() -> dict[str, Any]:
-    s = svc()
-    return {"ok": True, "engineRunning": s.engine.running, "revision": s.revision, **build_info(s.engine.root)}
+    # Doesn't touch a workspace, so the container healthcheck never starts or keeps a worker alive.
+    reg = workspaces.registry
+    return {"ok": True, "workspaces": len(reg.names()), "workers": reg.workers(), **build_info(find_repo_root())}
 
 
 @router.get("/version")
 def version() -> dict[str, Any]:
     """Package version, git commit and build time: compare the commit with `git rev-parse --short=9 HEAD`."""
-    return build_info(svc().engine.root)
+    return build_info(find_repo_root())
+
+
+@router.get("/workspace")
+def workspace() -> dict[str, Any]:
+    """The workspace this request is for (from the X-PoB-Workspace header or ?w=)."""
+    return {"name": workspaces.current_workspace.get()}
 
 
 @router.get("/revision")

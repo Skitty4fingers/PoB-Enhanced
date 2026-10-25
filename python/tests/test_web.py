@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from pob2 import mcp_server
+from pob2 import workspaces
 from pob2.web.app import create_app
 
 pytestmark = pytest.mark.engine
@@ -11,9 +11,10 @@ pytestmark = pytest.mark.engine
 
 @pytest.fixture(scope="module")
 def client(service):
-    mcp_server._service = service
+    workspaces.registry._services[workspaces.DEFAULT] = service
     with TestClient(create_app(with_mcp=False)) as c:
         yield c
+    workspaces.registry._services.pop(workspaces.DEFAULT, None)
 
 
 def test_build_flow(client):

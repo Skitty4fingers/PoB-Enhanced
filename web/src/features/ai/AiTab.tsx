@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Cloud, Copy, Laptop, Server } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { mcpUrl, workspace } from "../../api/workspace";
 
 function CopyBlock({ title, text }: { title: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -166,10 +167,11 @@ const GROUPS: { id: Client["group"]; label: string; icon: ReactNode; note: strin
 ];
 
 export function AiTab() {
-  const url = `${window.location.origin}/mcp`;
+  const url = mcpUrl(workspace);
   const [id, setId] = useState("claude-code");
   const [publicUrl, setPublicUrl] = useState("");
-  const pub = publicUrl.trim() ? `${publicUrl.trim().replace(/\/+$/, "").replace(/\/mcp$/, "")}/mcp` : "https://<your-public-address>/mcp";
+  const path = new URL(url).pathname;
+  const pub = `${publicUrl.trim() ? publicUrl.trim().replace(/\/+$/, "").replace(/(\/w\/[^/]+)?\/mcp$/, "") : "https://<your-public-address>"}${path}`;
   const client = CLIENTS.find((c) => c.id === id) ?? CLIENTS[0];
   const host = window.location.hostname;
   const port = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
@@ -179,7 +181,7 @@ export function AiTab() {
         <h2 className="text-lg font-semibold text-gold-soft">Connect an AI agent</h2>
         <p className="text-ink-400">
           This server is an MCP endpoint at <K>{url}</K>. Agents connected to it read and edit the same live build you see
-          here, this page refreshes as they work, and anything they change can be undone. Pick your assistant:
+          here (workspace <K>{workspace ?? "default"}</K>), this page refreshes as they work, and anything they change can be undone. Pick your assistant:
         </p>
       </section>
 

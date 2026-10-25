@@ -1,4 +1,4 @@
-"""REST API + static web UI + MCP endpoint, all sharing one live build.
+"""REST API + static web UI + MCP endpoint, sharing one live build per workspace (see pob2.workspaces).
 
 Run:  uv run --directory python pob2-web            -> http://127.0.0.1:8080  (MCP at /mcp)
 """
@@ -9,8 +9,10 @@ import argparse
 import contextlib
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 import httpx
 from fastapi import FastAPI, Request
@@ -18,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.transport_security import TransportSecuritySettings
 
-from pob2 import mcp_server
+from pob2 import mcp_server, workspaces
 from pob2.codec import CodecError
 from pob2.engine import EngineError, find_repo_root
 from pob2.version import __version__
@@ -50,6 +52,36 @@ def mcp_transport_security(extra_hosts: str | None = None) -> TransportSecurityS
     return TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=origins)
 
 
+class WorkspaceMiddleware:
+    """Run each request against the workspace it names: an X-PoB-Workspace header (web UI), ?w=<name>, or for MCP
+    /w/<name>/mcp, which is served as /mcp?w=<name> (a URL agents can take without quoting the "?")."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        if m := re.fullmatch(r"/w/([^/]+)/mcp/?", scope.get("path", "")):
+            query = scope.get("query_string", b"")
+            query = b"&".join(filter(None, [query, b"w=" + m.group(1).encode("latin-1")]))
+            scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "query_string": query}
+        headers = dict(scope.get("headers") or [])
+        name = headers.get(b"x-pob-workspace", b"").decode("latin-1")
+        if not name:
+            name = (parse_qs(scope.get("query_string", b"").decode("latin-1")).get("w") or [""])[0]
+        try:
+            name = workspaces.normalize(name)
+        except ValueError as exc:
+            response = JSONResponse({"error": str(exc), "code": "bad_request"}, status_code=400)
+            return await response(scope, receive, send)
+        token = workspaces.current_workspace.set(name)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            workspaces.current_workspace.reset(token)
+
+
 def create_app(with_mcp: bool = True) -> FastAPI:
     mcp_app = (
         mcp_server.mcp.streamable_http_app(streamable_http_path="/mcp", transport_security=mcp_transport_security())
@@ -64,12 +96,11 @@ def create_app(with_mcp: bool = True) -> FastAPI:
                 yield
         else:
             yield
-        if mcp_server._service is not None:
-            mcp_server._service.save_now()  # don't lose a change made in the last second
-            mcp_server._service.engine.stop()
+        workspaces.registry.shutdown()
 
     app = FastAPI(title="PoB-Enhanced", version=__version__, lifespan=lifespan)
     app.include_router(routes.router, prefix="/api")
+    app.add_middleware(WorkspaceMiddleware)
 
     @app.exception_handler(EngineError)
     async def engine_error(_: Request, exc: EngineError) -> JSONResponse:

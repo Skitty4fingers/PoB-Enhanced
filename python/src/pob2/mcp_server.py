@@ -8,27 +8,28 @@ from __future__ import annotations
 
 import argparse
 import functools
+import inspect
 import logging
 import sys
 from typing import Annotated, Any, Literal
 
 import httpx
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from pob2 import library as game_library
+from pob2 import workspaces
 from pob2.codec import CodecError
 from pob2.engine import EngineError
 from pob2.service import PoBService
-from pob2.store import BuildStore
 from pob2.version import __version__
 
 log = logging.getLogger("pob2.mcp")
 
 INSTRUCTIONS = """\
-Path of Building 2 (Path of Exile 2 build planner) running headless. One build is active at a time.
+Path of Building 2 (Path of Exile 2 build planner) running headless. Each workspace has one live build.
 Typical flow: load_build (share code / pobb.in link / XML) or new_build -> get_build_overview ->
 inspect with get_stats, list_skills, list_items, get_passive_tree -> evaluate changes with
 compare_item / compare_passives BEFORE applying them with equip_item / allocate_passives ->
@@ -44,11 +45,11 @@ Stat values are PoB's calculated numbers for the current configuration (see list
 enemy conditions and buffs in the config strongly affect DPS.
 Game facts PoB doesn't know (points per level, gem tiers, Spirit, caps) are in the library tool.
 Every change is undoable: checkpoint before experimenting, then undo / restore_history to go back. The user sees the
-same live build in the web UI. save_build keeps a named copy in the user's library (list_saved_builds).
+same live build in the web UI (/w/<workspace>, matching ?w=<workspace> on this endpoint). save_build keeps a named
+copy in the workspace's library (list_saved_builds).
 """
 
 mcp = MCPServer("pob2-enhanced", title="Path of Building 2", instructions=INSTRUCTIONS, version=__version__)
-_service: PoBService | None = None
 
 READ = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
@@ -57,32 +58,45 @@ REPLACE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHin
 NodeIds = Annotated[list[int], Field(description="Passive node ids (from search_passives or get_passive_tree)")]
 
 
+def request_workspace(ctx: Context | None) -> str | None:
+    """Workspace named by the HTTP request carrying this MCP message (?w=<name> or an X-PoB-Workspace header)."""
+    try:
+        request = ctx.request_context.request if ctx is not None else None
+    except ValueError:
+        return None  # outside a request
+    if request is None:
+        return None  # stdio
+    params = getattr(request, "query_params", None) or {}
+    headers = getattr(request, "headers", None) or {}
+    return params.get("w") or headers.get("x-pob-workspace")
+
+
 def tool(annotations: ToolAnnotations) -> Any:
-    """Register a tool, surfacing engine/codec errors to the agent as readable tool errors."""
+    """Register a tool that runs against the caller's workspace and surfaces engine/codec errors as tool errors."""
 
     def decorator(fn: Any) -> Any:
         @functools.wraps(fn)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, pob_ctx: Context | None = None, **kwargs: Any) -> Any:
             try:
-                return fn(*args, **kwargs)
+                name = request_workspace(pob_ctx) or workspaces.current_workspace.get()
+                with workspaces.use(name):
+                    return fn(*args, **kwargs)
             except (EngineError, CodecError, httpx.HTTPError, ValueError, OSError) as exc:
                 raise ToolError(str(exc)) from exc
 
+        # Ask the SDK to inject the request Context as `pob_ctx` (it is not part of the tool's input schema).
+        sig = inspect.signature(fn, eval_str=True)
+        ctx_param = inspect.Parameter("pob_ctx", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=Context)
+        wrapper.__signature__ = sig.replace(parameters=[*sig.parameters.values(), ctx_param])  # type: ignore[attr-defined]
+        wrapper.__annotations__ = {**fn.__annotations__, "pob_ctx": "Context"}
         return mcp.tool(annotations=annotations)(wrapper)
 
     return decorator
 
 
 def svc() -> PoBService:
-    global _service
-    if _service is None:
-        _service = PoBService(store=BuildStore())
-        try:
-            if _service.restore_saved_state():
-                log.info("Restored the build from %s", _service.store.root if _service.store else "?")
-        except Exception:  # noqa: BLE001 - a bad saved state must not stop the server
-            log.exception("Could not restore the saved build")
-    return _service
+    """The live build of the current workspace (see pob2.workspaces)."""
+    return workspaces.current()
 
 
 # -- build -----------------------------------------------------------------------------------------
