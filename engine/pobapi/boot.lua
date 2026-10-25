@@ -70,6 +70,9 @@ function M.start()
 		__mainObject__.main.disableDevAutoSave = true
 	end
 	runCallback("OnFrame")
+	-- Launch.lua sets a GC pause of 400 (the heap may grow to 4x its live size between cycles), which suits the desktop
+	-- app but lets heavy advice calls reach ~3 GB here; 150 keeps them under ~2 GB at the same speed.
+	collectgarbage("setpause", tonumber(os.getenv("POB2_GC_PAUSE")) or 150)
 
 	if __mainObject__.promptMsg then
 		error("PoB failed to start: " .. tostring(__mainObject__.promptMsg))

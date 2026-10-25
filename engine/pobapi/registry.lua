@@ -15,4 +15,20 @@ registry["worker.ping"] = function()
 	return { pong = true, version = launch.versionNumber, time = os.time(), patched = require("pobapi.boot").patched }
 end
 
+-- Lua heap and process memory (kB); collect=true runs a full garbage collection first.
+registry["worker.memory"] = function(params)
+	if params.collect then
+		collectgarbage("collect")
+	end
+	local mem = { luaKB = math.floor(collectgarbage("count")) }
+	local f = io.open("/proc/self/status", "r")
+	if f then
+		local status = f:read("*a")
+		f:close()
+		mem.rssKB = tonumber(status:match("VmRSS:%s*(%d+)"))
+		mem.peakKB = tonumber(status:match("VmHWM:%s*(%d+)"))
+	end
+	return mem
+end
+
 return registry

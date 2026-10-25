@@ -109,6 +109,8 @@ Notes:
 | `POB2_DATA` | `/data` (Docker), `~/.local/share/pob2`, `%LOCALAPPDATA%\pob2` | Current build (restored at start), saved builds, guide, item art |
 | `POB2_MAX_WORKERS` | `4` | PoB worker processes running at once (one per active [workspace](#workspaces)) |
 | `POB2_IDLE_MINUTES` | `20` | Stop a workspace's worker after this long without requests (`0` never does) |
+| `POB2_WORKER_MAX_MB` | `1200` | Restart a worker (keeping its build) when a slow call leaves it using more memory than this |
+| `POB2_GC_PAUSE` | `150` | Lua GC pause for workers (PoB's desktop default of 400 lets heavy advice calls reach ~3 GB) |
 
 ### Passive tree artwork
 

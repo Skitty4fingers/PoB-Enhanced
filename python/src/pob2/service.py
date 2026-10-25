@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -42,6 +43,18 @@ MUTATING = {
 
 # Largest accepted reference .build file (they are typically 20-100 KB).
 MAX_REFERENCE_BYTES = 2_000_000
+
+# LuaJIT never returns freed memory to the OS, so a worker keeps the peak of its biggest call (unique jewel advice on a
+# large build reaches ~3 GB). After a call slower than this, a worker over POB2_WORKER_MAX_MB is restarted.
+SLOW_CALL_SECONDS = 2.0
+
+
+def worker_max_mb() -> float:
+    try:
+        return float(os.environ.get("POB2_WORKER_MAX_MB", "").strip() or 1200)
+    except ValueError:
+        return 1200
+
 
 # Undo history kept in memory (each entry is one build XML, typically 20-60 KB).
 HISTORY_LIMIT = 40
@@ -113,7 +126,8 @@ class PoBService:
         # Held across each engine call and each multi-call operation, so clients sharing this build (two tabs, the
         # UI and an agent) don't interleave half-finished changes. Always taken before `_lock`, never after.
         self._busy = threading.RLock()
-        self._asleep = False  # worker stopped by hibernate(); the next engine call reloads the saved build
+        # (xml, name) of the build while the worker is stopped by hibernate(); the next engine call reloads it.
+        self._asleep: tuple[str, str | None] | None = None
         self.before_start: Callable[[], None] | None = None  # called before the worker starts (frees another one)
         # Reference build (PoE2 BuildPlanner .build JSON) the live build is compared against.
         self.reference: dict[str, Any] | None = None
@@ -130,25 +144,42 @@ class PoBService:
             self._wake()
             if mutating and not self._restoring and self._depth == 0:
                 self._record(LABELS.get(method, method))
+            started = time.monotonic()
             result = self.engine.call(method, {k: v for k, v in params.items() if v is not None})
             if mutating:
                 self.revision += 1
                 self._schedule_save()
+            if time.monotonic() - started > SLOW_CALL_SECONDS:
+                self._shed_memory(method)
         return result
+
+    def _shed_memory(self, method: str) -> None:
+        """Restart the worker if a heavy call left it holding more memory than POB2_WORKER_MAX_MB."""
+        try:
+            rss = (self.engine.call("worker.memory").get("rssKB") or 0) / 1024
+        except EngineError:
+            return
+        if rss > worker_max_mb() and self.hibernate():
+            log.info("Restarted the PoB worker after %s left it at %d MB", method, rss)
 
     # -- hibernation (see pob2.workspaces) --------------------------------------------------------
 
     def hibernate(self) -> bool:
         """Save the build and stop the worker to free its memory; undo history and guide stay in memory."""
         with self._busy:
-            if not self.engine.running or self.store is None:
+            if not self.engine.running:
                 return False
             with self._lock:
                 if self._save_timer is not None:
                     self._save_timer.cancel()
-            self.save_now()
+            try:
+                xml, name = self._export()
+            except EngineError:
+                log.exception("Could not export the build, so the worker keeps running")
+                return False
+            self._write_current(xml, name)
             self.engine.stop()
-            self._asleep = True
+            self._asleep = (xml, name)
             return True
 
     def _wake(self) -> None:
@@ -157,12 +188,10 @@ class PoBService:
             return
         if self.before_start is not None:
             self.before_start()
-        if not self._asleep:
+        if self._asleep is None:
             return
-        self._asleep = False
-        state = self.store.load_current() if self.store else None
-        if state:
-            self.engine.call("build.load_xml", {"xml": state["xml"], "name": state.get("name")})
+        (xml, name), self._asleep = self._asleep, None
+        self.engine.call("build.load_xml", {"xml": xml, "name": name})
 
     # -- history (undo / redo) --------------------------------------------------------------------
 
@@ -178,11 +207,13 @@ class PoBService:
             finally:
                 self._depth -= 1
 
+    def _export(self) -> tuple[str, str | None]:
+        return self.engine.call("build.export_xml")["xml"], self.engine.call("build.info").get("name")
+
     def _capture(self, label: str) -> Snapshot | None:
         self._wake()
         try:
-            xml = self.engine.call("build.export_xml")["xml"]
-            name = self.engine.call("build.info").get("name")
+            xml, name = self._export()
         except EngineError:
             return None  # nothing exportable (broken build)
         self._snapshot_ids += 1
@@ -268,7 +299,7 @@ class PoBService:
         state = self.store.load_current()
         if not state:
             return False
-        self._asleep = False
+        self._asleep = None
         self._restoring = True
         try:
             self.call("build.load_xml", xml=state["xml"], name=state.get("name"))
@@ -300,18 +331,26 @@ class PoBService:
             if not self.engine.running:
                 return  # hibernated or never started: what's on disk is already current
             try:
-                xml = self.engine.call("build.export_xml")["xml"]
-                name = self.engine.call("build.info").get("name")
-                state = {
-                    "xml": xml,
-                    "name": name,
-                    "source": self.source,
-                    "league": self.source_league,
-                    "loadedAt": self.source_loaded_at,
-                }
-                self.store.save_current(state)
-            except (EngineError, OSError):
+                xml, name = self._export()
+            except EngineError:
                 log.exception("Could not save the current build")
+                return
+            self._write_current(xml, name)
+
+    def _write_current(self, xml: str, name: str | None) -> None:
+        if self.store is None:
+            return
+        state = {
+            "xml": xml,
+            "name": name,
+            "source": self.source,
+            "league": self.source_league,
+            "loadedAt": self.source_loaded_at,
+        }
+        try:
+            self.store.save_current(state)
+        except OSError:
+            log.exception("Could not save the current build")
 
     # -- saved builds -----------------------------------------------------------------------------
 

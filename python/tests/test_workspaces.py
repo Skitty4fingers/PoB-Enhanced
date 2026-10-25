@@ -90,3 +90,23 @@ def test_workspaces_are_independent_and_hibernate(tmp_path):
         assert reg.get("bob").info()["className"] == "Witch"
     finally:
         reg.shutdown()
+
+
+@pytest.mark.engine
+def test_heavy_worker_is_restarted(monkeypatch):
+    from pob2 import service as service_module
+    from pob2.service import PoBService
+
+    monkeypatch.setattr(service_module, "SLOW_CALL_SECONDS", 0)
+    monkeypatch.setenv("POB2_WORKER_MAX_MB", "1")  # every call counts as heavy and over the limit
+    svc = PoBService()
+    try:
+        svc.new_build(class_name="Monk", level=33)
+        assert not svc.engine.running  # restarted after the call
+        info = svc.info()  # the next call brings the build back
+        assert info["className"] == "Monk" and info["level"] == 33
+        svc.set_character(level=40)
+        assert svc.undo()["undid"] == "Change character"
+        assert svc.info()["level"] == 33
+    finally:
+        svc.engine.stop()
