@@ -7,6 +7,7 @@ import type { BuildInfo, SourceInfo, VersionInfo } from "../api/types";
 import { ExportDialog, ImportDialog, NewBuildDialog } from "./BuildDialogs";
 import { BuildsButton, HistoryControls } from "./HistoryControls";
 import { LevelEditor } from "./LevelEditor";
+import { ThemePicker } from "./ThemeControls";
 
 type Dialog = "import" | "export" | "new" | null;
 
@@ -122,6 +123,7 @@ export function Header({ info, revision }: { info?: BuildInfo; revision?: number
         <button className="btn" onClick={() => setDialog("new")}><FilePlus2 size={14} /> New</button>
         <button className="btn" onClick={() => setDialog("import")}><Upload size={14} /> Import</button>
         <button className="btn btn-primary" onClick={() => setDialog("export")}><Download size={14} /> Export</button>
+        <ThemePicker />
         <button className="btn btn-ghost" onClick={() => { window.location.hash = "help"; }} title="Help guide" aria-label="Help guide"><CircleHelp size={16} /></button>
       </div>
       {dialog === "import" && <ImportDialog onClose={close} />}

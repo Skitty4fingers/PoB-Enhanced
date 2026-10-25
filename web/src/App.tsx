@@ -6,6 +6,7 @@ import { Header } from "./components/Header";
 import { BudgetCard } from "./components/BudgetCard";
 import { CommandPalette } from "./components/CommandPalette";
 import { StatPanel } from "./components/StatPanel";
+import { AscendancyBackdrop } from "./components/ThemeControls";
 import { AiTab } from "./features/ai/AiTab";
 import { CompareTab } from "./features/compare/CompareTab";
 import { ConfigTab } from "./features/config/ConfigTab";
@@ -49,6 +50,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      <AscendancyBackdrop info={overview.data?.info} />
       <Header info={overview.data?.info} revision={revision} />
       <WelcomeBanner />
       <CommandPalette />

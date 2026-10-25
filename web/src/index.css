@@ -22,6 +22,27 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Themes (see src/theme.ts). "classic" keeps the tokens above; the others tint the greys toward --tint and use it
+   as the accent. The darkened tint keeps backgrounds about as dark as classic. */
+:root[data-theme="frost"] { --tint: #7fb5e6; }
+:root[data-theme="ember"] { --tint: #e07a3a; }
+:root[data-theme="verdant"] { --tint: #6fbf73; }
+:root[data-theme="void"] { --tint: #a07bd0; }
+:root[data-theme="ascendancy"] { --tint: var(--accent, #c8a24a); }
+:root[data-theme]:not([data-theme="classic"]) {
+  --tint-dark: color-mix(in oklab, var(--tint) 30%, black);
+  --color-ink-950: color-mix(in oklab, #0b0c0e 85%, var(--tint-dark));
+  --color-ink-900: color-mix(in oklab, #121418 82%, var(--tint-dark));
+  --color-ink-850: color-mix(in oklab, #171a1f 80%, var(--tint-dark));
+  --color-ink-800: color-mix(in oklab, #1d2127 80%, var(--tint-dark));
+  --color-ink-700: color-mix(in oklab, #2a2f37 78%, var(--tint-dark));
+  --color-ink-600: color-mix(in oklab, #3a4049 78%, var(--tint-dark));
+  --color-ink-400: color-mix(in oklab, #7d8591 90%, var(--tint));
+  --color-ink-200: color-mix(in oklab, #c9ced6 94%, var(--tint));
+  --color-gold: var(--tint);
+  --color-gold-soft: color-mix(in oklab, var(--tint) 60%, white);
+}
+
 html, body, #root { height: 100%; }
 body { background: var(--color-ink-950); color: var(--color-ink-200); font-family: var(--font-sans); }
 
@@ -30,6 +51,7 @@ body { background: var(--color-ink-950); color: var(--color-ink-200); font-famil
   .btn-primary { @apply border-gold/60 bg-gold/15 text-gold-soft hover:bg-gold/25; }
   .btn-ghost { @apply border-transparent bg-transparent px-2; }
   .input { @apply w-full rounded-md border border-ink-600 bg-ink-900 px-2.5 py-1.5 text-sm text-ink-200 outline-none placeholder:text-ink-400 focus:border-gold; }
-  .panel { @apply rounded-lg border border-ink-700 bg-ink-850; }
+  /* Slightly see-through so the ascendancy backdrop shows; no backdrop-filter, which would trap fixed-position modals. */
+  .panel { @apply rounded-lg border border-ink-700 bg-ink-850/90; }
   .label { @apply text-xs font-medium uppercase tracking-wide text-ink-400; }
 }

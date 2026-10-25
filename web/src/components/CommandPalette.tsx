@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Command, Gem, Network, Search, Settings2, Shield, Sigma, Zap } from "lucide-react";
+import { ArrowRight, Command, Gem, Network, Palette as PaletteIcon, Search, Settings2, Shield, Sigma, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, qs } from "../api/client";
 import { useConfig, useItems, useOverview, useSkills } from "../api/hooks";
 import type { TreeNodeInfo } from "../api/types";
+import { setThemeSettings, THEMES, useThemeSettings } from "../theme";
 
 /** A node for the tree tab to centre on once it is showing (set by the palette, read by TreeTab). */
 export const pendingFocus: { id: number | null } = { id: null };
@@ -61,6 +62,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   const skills = useSkills();
   const config = useConfig(true);
   const overview = useOverview();
+  const theme = useThemeSettings();
   const nodes = useQuery({
     queryKey: ["palette-nodes", debounced],
     queryFn: () => api.get<TreeNodeInfo[]>(`/tree/search${qs({ q: debounced, limit: 8 })}`),
@@ -78,6 +80,15 @@ function Palette({ onClose }: { onClose: () => void }) {
       if (match(label)) out.push({ group: "Go to", icon: <ArrowRight size={14} />, label, run: () => go(hash) });
     }
     if (!q) return out;
+    for (const t of THEMES) {
+      if (match(`Theme: ${t.label}`)) {
+        out.push({ group: "Theme", icon: <PaletteIcon size={14} />, label: `Theme: ${t.label}`, hint: theme.theme === t.id ? "current" : undefined, run: () => setThemeSettings({ theme: t.id }) });
+      }
+    }
+    const backdropLabel = `${theme.backdrop ? "Hide" : "Show"} ascendancy background art`;
+    if (match(backdropLabel) || match("theme background")) {
+      out.push({ group: "Theme", icon: <PaletteIcon size={14} />, label: backdropLabel, run: () => setThemeSettings({ backdrop: !theme.backdrop }) });
+    }
     for (const n of nodes.data ?? []) {
       out.push({
         group: "Passives", icon: <Network size={14} />, label: n.name,
@@ -109,7 +120,7 @@ function Palette({ onClose }: { onClose: () => void }) {
       }
     }
     return out.slice(0, 60);
-  }, [q, nodes.data, items.data, skills.data, config.data, overview.data]);
+  }, [q, nodes.data, items.data, skills.data, config.data, overview.data, theme]);
 
   useEffect(() => { setIndex(0); }, [q]);
   const pick = (r?: Result) => { if (!r) return; onClose(); r.run(); };
