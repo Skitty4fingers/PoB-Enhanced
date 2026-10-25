@@ -1,4 +1,4 @@
-# PoB2-Enhanced
+# PoB-Enhanced
 
 A fork of Path of Building 2 (PoE2 build planner, Lua) that adds a headless engine, an MCP server, a REST API and a web UI.
 Full docs: `docs/enhanced.md`.

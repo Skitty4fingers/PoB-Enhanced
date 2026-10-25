@@ -1,6 +1,6 @@
 # PoB-Enhanced: headless engine, MCP server and web UI
 
-PoB2-Enhanced runs the unmodified Path of Building 2 calculation engine without the Windows desktop UI. It adds:
+PoB-Enhanced runs the unmodified Path of Building 2 calculation engine without the Windows desktop UI. It adds:
 
 | Layer | Path | What it is |
 |---|---|---|
@@ -127,7 +127,7 @@ Without the artwork the tree falls back to plain circles. Tree links use the off
 Elsewhere:
 
 ```bash
-claude mcp add pob2 -- uv run --directory /path/to/PoB2-Enhanced/python pob2-mcp
+claude mcp add pob2 -- uv run --directory /path/to/PoB-Enhanced/python pob2-mcp
 claude mcp add --transport http pob2 http://127.0.0.1:8080/mcp     # share the web UI's live build
 ```
 
@@ -136,7 +136,7 @@ claude mcp add --transport http pob2 http://127.0.0.1:8080/mcp     # share the w
 ```json
 {
   "mcpServers": {
-    "pob2": { "command": "uv", "args": ["run", "--directory", "C:/path/to/PoB2-Enhanced/python", "pob2-mcp"] }
+    "pob2": { "command": "uv", "args": ["run", "--directory", "C:/path/to/PoB-Enhanced/python", "pob2-mcp"] }
   }
 }
 ```
@@ -269,7 +269,7 @@ The Tree tab's **Advisor** panel (and `get_advice`) answers three questions, mea
 
 PoB reports a totem skill's DPS **per totem**, reserves Ancestral Bond's "75 Spirit per totem" only once, and does not
 parse "Your Totem Limit is doubled". On its own it therefore can't show that a weapon with less Spirit costs totems.
-PoB2-Enhanced adds a Spirit/totem budget on top of PoB's outputs (`engine/pobapi/api/budget.lua`):
+PoB-Enhanced adds a Spirit/totem budget on top of PoB's outputs (`engine/pobapi/api/budget.lua`):
 
 - totem cap = PoB's limit, doubled for Ancestral Bond while PoB doesn't apply it (detected at runtime)
 - totems kept up = min(cap, Spirit available ÷ Spirit per totem), or the Config tab's "# of Summoned Totems"

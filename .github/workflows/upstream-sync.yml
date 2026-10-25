@@ -1,0 +1,87 @@
+name: Sync upstream
+
+# Once a day, checks PathOfBuildingCommunity/PathOfBuilding-PoE2 (dev) for commits that main doesn't have yet. When it
+# finds some, it points the upstream-sync branch at upstream's dev and opens a pull request into main, so updates are
+# reviewed (and tested) before they land. Merge conflicts are resolved locally:
+#   git fetch origin && git merge origin/upstream-sync
+#
+# One-time setup: add a fine-grained personal access token as the SYNC_TOKEN repository secret (this repository only;
+# Contents, Pull requests and Workflows: read and write). Without it the job falls back to GITHUB_TOKEN, which
+#   - needs Settings -> Actions -> General -> "Allow GitHub Actions to create and approve pull requests",
+#   - can't push upstream commits that change .github/workflows, and
+#   - opens pull requests that don't trigger the test workflows.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: PathOfBuildingCommunity/PathOfBuilding-PoE2
+  UPSTREAM_BRANCH: dev
+  SYNC_BRANCH: upstream-sync
+  GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # Cheap check first, so the 1.5 GB clone only happens on days upstream has something new.
+      - name: Check for new upstream commits
+        id: check
+        run: |
+          sha=$(git ls-remote "https://github.com/$UPSTREAM_REPO.git" "refs/heads/$UPSTREAM_BRANCH" | cut -f1)
+          echo "upstream $UPSTREAM_BRANCH is at $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/${{ github.event.repository.default_branch }}...$sha" --jq .status 2>/dev/null || echo unknown)
+          synced=$(gh api "repos/$GITHUB_REPOSITORY/branches/$SYNC_BRANCH" --jq .commit.sha 2>/dev/null || true)
+          if [ "$status" = "behind" ] || [ "$status" = "identical" ]; then
+            echo "Already merged into ${{ github.event.repository.default_branch }}."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          elif [ "$synced" = "$sha" ]; then
+            echo "$SYNC_BRANCH is already at $sha; its pull request is open or was closed on purpose."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.needed == 'true'
+        with:
+          fetch-depth: 0
+          token: ${{ env.GH_TOKEN }}
+
+      - name: Push sync branch and open pull request
+        if: steps.check.outputs.needed == 'true'
+        env:
+          SHA: ${{ steps.check.outputs.sha }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch --no-tags "https://github.com/$UPSTREAM_REPO.git" "$SHA"
+          git push --force origin "$SHA:refs/heads/$SYNC_BRANCH"
+
+          count=$(git rev-list --count "origin/$BASE..$SHA")
+          {
+            echo "Merges $count new commit(s) from [$UPSTREAM_REPO@$UPSTREAM_BRANCH](https://github.com/$UPSTREAM_REPO/commits/$UPSTREAM_BRANCH) into \`$BASE\`."
+            echo
+            echo '```'
+            git log --oneline --no-merges -n 50 "origin/$BASE..$SHA"
+            echo '```'
+            echo
+            echo "If GitHub reports conflicts, resolve them locally: \`git fetch origin && git merge origin/$SYNC_BRANCH\`."
+            echo "Opened by the Sync upstream workflow."
+          } > body.md
+
+          title="Sync upstream $UPSTREAM_BRANCH ($count new commits)"
+          if [ -n "$(gh pr list --head "$SYNC_BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')" ]; then
+            gh pr edit "$SYNC_BRANCH" --title "$title" --body-file body.md
+          else
+            gh pr create --head "$SYNC_BRANCH" --base "$BASE" --title "$title" --body-file body.md
+          fi

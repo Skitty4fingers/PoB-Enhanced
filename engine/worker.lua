@@ -1,4 +1,4 @@
--- PoB2-Enhanced headless engine worker.
+-- PoB-Enhanced headless engine worker.
 -- Speaks newline-delimited JSON-RPC over stdin/stdout. All PoB console output goes to stderr.
 -- Must be started with the working directory set to src/:  luajit ../engine/worker.lua
 local engineDir = (arg and arg[0] or ""):match("^(.*)[/\\]worker%.lua$") or "../engine"

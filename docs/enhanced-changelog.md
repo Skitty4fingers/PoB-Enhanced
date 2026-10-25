@@ -1,4 +1,4 @@
-# PoB2-Enhanced changelog
+# PoB-Enhanced changelog
 
 Versions of the enhanced layer (engine API, MCP server, REST API, web UI). The upstream Path of Building changes
 are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.

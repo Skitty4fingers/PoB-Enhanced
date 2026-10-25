@@ -1,4 +1,4 @@
-# PoB2-Enhanced on your tailnet: https://<TS_HOSTNAME>.<TS_TAILNET>  (MCP at /mcp)
+# PoB-Enhanced on your tailnet: https://<TS_HOSTNAME>.<TS_TAILNET>  (MCP at /mcp)
 # No host ports are published; only devices on your tailnet can reach it.
 #
 #   cp .env.example .env   # fill in TS_AUTHKEY and TS_TAILNET

@@ -68,7 +68,7 @@ def create_app(with_mcp: bool = True) -> FastAPI:
             mcp_server._service.save_now()  # don't lose a change made in the last second
             mcp_server._service.engine.stop()
 
-    app = FastAPI(title="PoB2-Enhanced", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="PoB-Enhanced", version=__version__, lifespan=lifespan)
     app.include_router(routes.router, prefix="/api")
 
     @app.exception_handler(EngineError)
@@ -121,7 +121,7 @@ def create_app(with_mcp: bool = True) -> FastAPI:
 def main(argv: list[str] | None = None) -> None:
     import uvicorn
 
-    parser = argparse.ArgumentParser(description="PoB2-Enhanced web UI + REST API + MCP endpoint")
+    parser = argparse.ArgumentParser(description="PoB-Enhanced web UI + REST API + MCP endpoint")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--no-mcp", action="store_true", help="Do not expose the MCP endpoint at /mcp")

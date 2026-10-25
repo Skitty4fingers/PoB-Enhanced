@@ -41,7 +41,7 @@ def find_repo_root(start: Path | None = None) -> Path:
     for path in candidates:
         if (path / "src" / "Launch.lua").is_file() and (path / "engine" / "worker.lua").is_file():
             return path
-    raise EngineError("Could not find the PoB2-Enhanced repository. Set POB2_ROOT to the repo root.", "config")
+    raise EngineError("Could not find the PoB-Enhanced repository. Set POB2_ROOT to the repo root.", "config")
 
 
 def find_luajit() -> str:

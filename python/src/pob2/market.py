@@ -20,7 +20,7 @@ import httpx
 
 NINJA = "https://poe.ninja"
 TRADE = "https://www.pathofexile.com/trade2/search/poe2"
-HEADERS = {"User-Agent": "PoB2-Enhanced (+https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2)"}
+HEADERS = {"User-Agent": "PoB-Enhanced (+https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2)"}
 UNIQUE_TYPES = ("UniqueWeapons", "UniqueArmours", "UniqueAccessories", "UniqueJewels", "UniqueFlasks", "UniqueCharms")
 # Ladder page: /poe2/builds/<league>/character/<account>/<name>
 # Profile page: /poe2/profile/<account>/<league>/character/<name>

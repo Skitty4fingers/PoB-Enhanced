@@ -1,4 +1,4 @@
-"""PoB2-Enhanced: headless Path of Building 2 for AI agents and the web."""
+"""PoB-Enhanced: headless Path of Building 2 for AI agents and the web."""
 
 from pob2.engine import Engine, EngineError
 from pob2.service import PoBService

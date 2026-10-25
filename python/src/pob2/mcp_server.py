@@ -672,7 +672,7 @@ def optimize_passives(goal: str = "more DPS without losing life", points: int = 
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="PoB2-Enhanced MCP server")
+    parser = argparse.ArgumentParser(description="PoB-Enhanced MCP server")
     parser.add_argument("--http", action="store_true", help="Serve streamable HTTP instead of stdio")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
