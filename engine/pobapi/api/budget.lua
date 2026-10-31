@@ -290,7 +290,43 @@ function M._resources(output)
 	return res
 end
 
+-- Allocated jewel sockets this jewel can go into, as slot names. `wanted` is a slot name ("Jewel 12345"), a bare
+-- passive node id, or nil for every socket the build has allocated.
+local function jewelSlotsFor(b, item, wanted)
+	if wanted ~= nil then
+		local name = tostring(wanted)
+		if name:match("^%d+$") then
+			name = "Jewel " .. name
+		end
+		local slot = b.itemsTab.slots[name]
+		if not slot or not slot.nodeId then
+			util.fail("Not a jewel socket: " .. tostring(wanted) .. " (use a slot like \"Jewel 12345\" from list_items)")
+		end
+		if not b.spec.allocNodes[slot.nodeId] then
+			util.fail(("Jewel socket %s is not allocated on your passive tree"):format(name))
+		end
+		if not b.itemsTab:IsItemValidForSlot(item, name) then
+			util.fail(("%s can't go into %s"):format(item.name, name))
+		end
+		return { name }
+	end
+	local res = { }
+	for _, slot in ipairs(b.itemsTab.orderedSlots) do
+		if slot.nodeId and b.spec.allocNodes[slot.nodeId] and b.itemsTab:IsItemValidForSlot(item, slot.slotName) then
+			res[#res + 1] = slot.slotName
+		end
+	end
+	if #res == 0 then
+		util.fail("No allocated jewel socket on your passive tree can hold this jewel")
+	end
+	return res
+end
+
 local function slotFor(b, item, wanted)
+	-- A jewel's "primary slot" is just "Jewel", which is not a slot: it goes into one of the allocated sockets.
+	if item.type == "Jewel" then
+		return jewelSlotsFor(b, item, wanted)
+	end
 	if wanted then
 		if not b.itemsTab.slots[wanted] then
 			util.fail("Unknown slot: " .. tostring(wanted))
@@ -307,15 +343,6 @@ local function slotFor(b, item, wanted)
 	end
 	if primary == "Ring 1" then
 		return { "Ring 1", "Ring 2" }
-	end
-	if item.type == "Jewel" then
-		local res = { }
-		for _, slot in ipairs(b.itemsTab.orderedSlots) do
-			if slot.nodeId and b.spec.allocNodes[slot.nodeId] then
-				res[#res + 1] = slot.slotName
-			end
-		end
-		return res
 	end
 	return { primary }
 end
@@ -347,7 +374,16 @@ function M.check_item(params)
 		util.fail("This item doesn't fit any of your slots")
 	end
 	local out, cmp = best.out, best.cmp
+	-- nil for an empty socket or slot (selItemId is 0 then).
 	local current = b.itemsTab.items[b.itemsTab.slots[best.slot].selItemId]
+
+	-- Mod lines PoB can't parse (flavour text, unsupported mods): reported, never fatal, and not counted in the numbers.
+	local unsupported = util.array()
+	for _, line in ipairs(require("pobapi.api.items").describe(item, true).mods) do
+		if not line.supported then
+			unsupported[#unsupported + 1] = line.text
+		end
+	end
 
 	-- Each damage skill, measured as the main skill, with its totems counted.
 	local skills = util.array()
