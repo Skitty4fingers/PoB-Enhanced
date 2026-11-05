@@ -537,6 +537,35 @@ export interface UniquesAdvice {
   slots: { slot: string; items: UniqueSuggestion[] }[];
 }
 
+export interface ShopListing {
+  slot: string;
+  group?: string;
+  name: string;
+  baseName?: string;
+  replaces?: string;
+  dpsPercent: number;
+  ehpPercent: number;
+  gain: number;
+  price?: string | null;
+  priceDivine?: number | null;
+  gainPerDivine?: number | null;
+  seller?: string;
+  online?: string;
+  whisper?: string;
+  warnings: string[];
+  reasons: string[];
+  itemText: string;
+}
+
+export interface BestInShop {
+  league: string;
+  maxPrice?: number | null;
+  best: ShopListing[];
+  slots: { slot: string; headroom?: number; items: ShopListing[] }[];
+  searched: { slot: string; listings: number; upgrades: number; tradeUrl?: string }[];
+  errors: { slot: string; error: string }[];
+}
+
 export interface GemAdviceGem {
   index: number;
   name: string;

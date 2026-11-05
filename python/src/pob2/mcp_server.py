@@ -531,6 +531,18 @@ def shopping_advice(
 
 
 @tool(READ)
+def best_in_shop(
+    metric: Metric = "balanced",
+    league: Annotated[str | None, Field(description="Trade league (default: the build's or current league)")] = None,
+    max_price: Annotated[float | None, Field(description="Budget in divine orbs")] = None,
+    slots: Annotated[int, Field(description="How many slots to search (most headroom first)", ge=1, le=10)] = 5,
+) -> dict[str, Any]:
+    """Real, currently listed trade items (rares too) that are upgrades: searches the trade site for the slots with
+    most headroom, runs every listing through check_item and returns the best buys. Slow (~15-60s, rate limited)."""
+    return svc().best_in_shop(metric, league, max_price, slots)
+
+
+@tool(READ)
 def socket_advice(
     metric: Metric = "balanced",
     slot: Annotated[str | None, Field(description="One slot (e.g. Body Armour); omit for all socketed items")] = None,

@@ -168,6 +168,102 @@ def trade_url(league: str, query: dict[str, Any]) -> str:
     return f"{TRADE}/{quote(league)}?q={quote(json.dumps(query, separators=(',', ':')))}"
 
 
+TRADE_API = "https://www.pathofexile.com/api/trade2"
+_trade_lock = threading.Lock()
+_trade_next = 0.0  # monotonic time before which no trade request may start
+_MARKUP_PIPE = re.compile(r"\[[^\]|]*\|([^\]]*)\]")
+_MARKUP = re.compile(r"\[([^\]]*)\]")
+
+
+def _trade_request(method: str, url: str, **kwargs: Any) -> Any:
+    """One polite trade-site request: serialised, spaced out, and backing off on 429 (Retry-After)."""
+    global _trade_next
+    for attempt in range(3):
+        with _trade_lock:
+            wait = _trade_next - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            resp = httpx.request(method, url, headers=HEADERS, timeout=25.0, **kwargs)
+            delay = 1.5
+            if resp.status_code == 429:
+                delay = float(resp.headers.get("Retry-After", "10")) + 1
+            _trade_next = time.monotonic() + delay
+        if resp.status_code == 429 and attempt < 2:
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise RuntimeError("trade site rate limit")
+
+
+def trade_search(league: str, query: dict[str, Any], limit: int = 10) -> list[dict[str, Any]]:
+    """Run a trade search and fetch the first `limit` listings (best first, in the query's own sort order)."""
+    found = _trade_request("POST", f"{TRADE_API}/search/poe2/{quote(league)}", json=query)
+    ids = (found.get("result") or [])[:limit]
+    out: list[dict[str, Any]] = []
+    for i in range(0, len(ids), 10):
+        batch = ids[i : i + 10]
+        data = _trade_request("GET", f"{TRADE_API}/fetch/{','.join(batch)}", params={"query": found["id"]})
+        out.extend(r for r in data.get("result") or [] if r)
+    return out
+
+
+def with_max_price(query: dict[str, Any], divine: float | None) -> dict[str, Any]:
+    """Copy of a trade query restricted to listings priced at most `divine` (any currency, via divine equivalent)."""
+    if divine is None:
+        return query
+    q = json.loads(json.dumps(query))
+    filters = q["query"].setdefault("filters", {})
+    filters.setdefault("trade_filters", {"filters": {}})["filters"]["price"] = {"option": "divine", "max": divine}
+    return q
+
+
+def _clean(text: str) -> str:
+    return _MARKUP.sub(r"\1", _MARKUP_PIPE.sub(r"\1", text))
+
+
+def listing_price(listing: dict[str, Any], rates: dict[str, float]) -> float | None:
+    """A listing's price in divine orbs (None when the currency is unknown)."""
+    price = listing.get("price") or {}
+    amount, cur = price.get("amount"), price.get("currency")
+    if amount is None or not cur:
+        return None
+    if cur == "divine":
+        return float(amount)
+    rate = rates.get(cur)
+    return float(amount) / rate if rate else None
+
+
+def listing_text(item: dict[str, Any]) -> str:
+    """Trade-site item JSON -> the item text Path of Building reads (rarity, base, level, implicits, mods)."""
+    rarity = str(item.get("rarity") or "Rare").upper()
+    base = item.get("baseType") or item.get("typeLine") or ""
+    lines = [f"Rarity: {rarity}"]
+    name = item.get("name")
+    if rarity in ("RARE", "UNIQUE") and name:
+        lines.append(_clean(name))
+    lines.append(_clean(item.get("typeLine") or base) if rarity != "RARE" else _clean(base))
+    if item.get("ilvl"):
+        lines.append(f"Item Level: {item['ilvl']}")
+    implicit = [_clean(m["description"]) if isinstance(m, dict) else _clean(m) for m in item.get("implicitMods") or []]
+    for key in ("enchantMods",):
+        implicit += [_clean(m) for m in item.get(key) or []]
+    lines.append(f"Implicits: {len(implicit)}")
+    lines += implicit
+    for key, tag in (
+        ("explicitMods", ""),
+        ("fracturedMods", "{fractured}"),
+        ("desecratedMods", "{desecrated}"),
+        ("craftedMods", "{crafted}"),
+        ("runeMods", "{rune}"),
+    ):
+        for mod in item.get(key) or []:
+            text = mod["description"] if isinstance(mod, dict) else mod
+            lines += [tag + _clean(part) for part in str(text).split("\n") if part]
+    if item.get("corrupted"):
+        lines.append("Corrupted")
+    return "\n".join(lines)
+
+
 def unique_query(name: str, base: str | None = None) -> dict[str, Any]:
     query: dict[str, Any] = {"status": {"option": "online"}, "name": name}
     if base:

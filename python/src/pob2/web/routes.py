@@ -495,6 +495,16 @@ def gear_uniques(
     return svc().gear_uniques(metric, league, maxPrice)
 
 
+@router.get("/gear/best-in-shop")
+def best_in_shop(
+    metric: Literal["balanced", "dps", "ehp"] = "balanced",
+    league: str | None = None,
+    maxPrice: float | None = Query(None, ge=0),  # noqa: N803 - query parameter name
+    slots: int = Query(5, ge=1, le=10),
+) -> Any:
+    return svc().best_in_shop(metric, league, maxPrice, slots)
+
+
 @router.get("/market/leagues")
 def market_leagues() -> Any:
     from pob2 import market

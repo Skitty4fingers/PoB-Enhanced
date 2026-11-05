@@ -3,7 +3,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, CircleDot, ClipboardCheck, Ex
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, qs } from "../../api/client";
 import { useBuildMutation } from "../../api/hooks";
-import type { Gain, GearSlot, GearSlotRef, GemAdvice, JewelSockets, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
+import type { BestInShop as BestInShopResult, ShopListing, Gain, GearSlot, GearSlotRef, GemAdvice, JewelSockets, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
 import { ErrorText } from "../../components/ErrorText";
 import { ItemArt } from "../../components/ItemArt";
 import { ItemVerdict } from "../../components/ItemVerdict";
@@ -270,8 +270,70 @@ function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: b
   );
 }
 
-function ShopSection({ uniques, loading, error, budget, setBudget }: {
-  uniques?: UniquesAdvice; loading: boolean; error: unknown; budget: string; setBudget: (v: string) => void;
+function ListingRow({ l }: { l: ShopListing }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <tr className="border-t border-ink-800 align-top">
+      <td className="py-1.5 pr-2">
+        <div className="text-rare">{l.name}</div>
+        <div className="text-xs text-ink-400">{l.baseName} · {l.group ?? l.slot}{l.replaces ? ` · replaces ${l.replaces}` : ""}</div>
+        {l.warnings.map((w) => <div key={w} className="text-xs text-warn"><AlertTriangle size={11} className="mr-1 inline" />{w}</div>)}
+      </td>
+      <td className="pr-2 text-xs"><GainText g={l} /></td>
+      <td className="whitespace-nowrap pr-2 text-right tabular-nums">
+        <div className="text-ink-200">{l.price ?? "price?"}</div>
+        <div className="text-xs text-ink-400">{l.online ?? ""}</div>
+      </td>
+      <td className="whitespace-nowrap text-right">
+        <span className="inline-flex items-center gap-2">
+          <button className="text-gold hover:underline" title="Copy whisper to buy" disabled={!l.whisper}
+            onClick={() => { void navigator.clipboard?.writeText(l.whisper ?? "").then(() => setCopied(true)); }}>
+            {copied ? "copied" : "whisper"}
+          </button>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+/** Searches the real trade site for the slots with most headroom and keeps only the listings PoB says are upgrades. */
+function BestInShop({ metric, league, maxPrice }: { metric: Metric; league?: string; maxPrice?: number }) {
+  const run = useMutation({
+    mutationFn: () => api.get<BestInShopResult>(`/gear/best-in-shop${qs({ metric, league, maxPrice })}`),
+  });
+  const d = run.data;
+  return (
+    <div className="panel space-y-3 border-l-4 border-l-unique p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn btn-primary" disabled={run.isPending} onClick={() => run.mutate()}>
+          <Sparkles size={14} /> {run.isPending ? "Searching trade…" : "Best in shop"}
+        </button>
+        <span className="text-xs text-ink-400">
+          Checks what is listed right now (rares too) for your top upgrade slots, and keeps only real upgrades{maxPrice ? ` up to ${maxPrice} div` : ""}. Takes up to a minute.
+        </span>
+      </div>
+      <ErrorText error={run.error} />
+      {d && (
+        <>
+          {d.best.length === 0 && <p className="text-sm text-ink-400">No listed item beat your current gear in the {d.searched.length} slot(s) searched{d.maxPrice ? ` within ${d.maxPrice} div` : ""}.</p>}
+          {d.best.length > 0 && (
+            <table className="w-full text-sm"><tbody>{d.best.map((l) => <ListingRow key={l.group + l.name + l.seller} l={l} />)}</tbody></table>
+          )}
+          {d.slots.filter((s) => s.items.length > 1).map((s) => (
+            <details key={s.slot} className="text-sm">
+              <summary className="cursor-pointer text-ink-400">More for {s.slot} ({s.items.length - 1})</summary>
+              <table className="w-full text-sm"><tbody>{s.items.slice(1).map((l) => <ListingRow key={l.name + l.seller} l={l} />)}</tbody></table>
+            </details>
+          ))}
+          {d.errors.length > 0 && <p className="text-xs text-bad">Trade search failed for {d.errors.map((e) => `${e.slot} (${e.error})`).join(", ")}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ShopSection({ uniques, loading, error, budget, setBudget, metric, league }: {
+  uniques?: UniquesAdvice; loading: boolean; error: unknown; budget: string; setBudget: (v: string) => void; metric: Metric; league?: string;
 }) {
   const deals = useMemo(() => {
     const all = (uniques?.slots ?? []).flatMap((s) => s.items.map((i) => ({ ...i, group: s.slot })));
@@ -286,6 +348,7 @@ function ShopSection({ uniques, loading, error, budget, setBudget }: {
         {uniques?.rates?.exalted ? <span className="text-xs text-ink-400">(1 div ≈ {Math.round(uniques.rates.exalted)} ex)</span> : null}
         <span className="ml-auto text-xs text-ink-400">Prices from poe.ninja{uniques?.league ? ` · ${uniques.league}` : ""}. Gains measured in your build by PoB.</span>
       </div>
+      <BestInShop metric={metric} league={league} maxPrice={budget ? Number(budget) : undefined} />
       <ErrorText error={error} />
       {loading && <p className="text-sm text-ink-400">Testing every unique in your build…</p>}
       {deals.length > 0 && (
@@ -639,7 +702,7 @@ export function UpgradesTab() {
       {section === "jewels" && <GearSection jewels metric={metric} league={activeLeague} uniques={uniques.data} />}
       {section === "sockets" && <SocketsSection metric={metric} />}
       {section === "gems" && <GemsSection metric={metric} />}
-      {section === "shop" && <ShopSection uniques={uniques.data} loading={uniques.isLoading} error={uniques.error} budget={budget} setBudget={setBudget} />}
+      {section === "shop" && <ShopSection uniques={uniques.data} loading={uniques.isLoading} error={uniques.error} budget={budget} setBudget={setBudget} metric={metric} league={activeLeague} />}
     </div>
   );
 }
