@@ -486,6 +486,7 @@ function M.check_item(params)
 		verdict = verdict,
 		reasons = reasons,
 		warnings = cmp.warnings,
+		unsupported = unsupported,
 		budget = { before = cmp.before, after = cmp.after },
 		lostSkills = lostSkills,
 		skills = skills,

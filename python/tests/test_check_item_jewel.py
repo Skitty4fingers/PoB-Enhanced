@@ -60,9 +60,12 @@ def test_check_item_jewel_in_allocated_socket(service):
     if socket is None:
         pytest.skip("no jewel sockets in this tree")
     service.call("tree.allocate", ids=[socket["jewelNodeId"]])
-    check = service.check_item(PRISM)
+    odd = "Summons a flock of imaginary penguins"
+    mod = "+3 to Level of all Ice Shards Skills"
+    check = service.check_item(PRISM.replace(mod, mod + chr(10) + odd))
     assert check["slot"].startswith("Jewel ") and check["verdict"] in {"upgrade", "sidegrade", "downgrade"}
-    assert "Entropy can be reversed." in check["unsupported"]
+    # Mod lines PoB can't parse are reported, never fatal (flavour text is not a mod line).
+    assert odd in check["unsupported"] and "Entropy can be reversed." not in check["unsupported"]
     assert service.check_item(PRISM, check["slot"])["slot"] == check["slot"]
     with pytest.raises(Exception, match="jewel socket"):
         service.check_item(PRISM, "Weapon 1")

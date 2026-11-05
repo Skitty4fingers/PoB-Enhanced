@@ -443,7 +443,8 @@ UNNAMED_HEARTWOOD, ANCESTRAL_BOND = 52374, 45202
 
 
 def test_budget_spell_totem_cap(service):
-    # Spell Totem OVERRIDEs the totem limit to 2, which drops Unnamed Heartwood's +1; in game the doubled limit is 6 ((2 + 1) x 2).
+    # Spell Totem OVERRIDEs the totem limit to 2, which drops Unnamed Heartwood's +1;
+    # in game the doubled limit is 6 ((2 + 1) x 2).
     service.new_build("Druid", "Oracle", 90)
     service.call("tree.allocate", ids=[UNNAMED_HEARTWOOD, ANCESTRAL_BOND])
     service.call(
