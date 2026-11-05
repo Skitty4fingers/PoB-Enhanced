@@ -34,3 +34,20 @@ def test_with_max_price_does_not_mutate() -> None:
     capped = market.with_max_price(query, 3)
     assert capped["query"]["filters"]["trade_filters"]["filters"]["price"] == {"option": "divine", "max": 3}
     assert "filters" not in query["query"]
+
+
+def test_anonymous_query_replaces_weights_with_a_count_group() -> None:
+    weighted = {
+        "engine": "new",
+        "query": {
+            "stats": [
+                {"type": "weight", "filters": [{"id": f"explicit.stat_{i}", "value": {"weight": 1}} for i in range(20)]}
+            ]
+        },
+        "sort": {"statgroup.0": "desc"},
+    }
+    q = market.anonymous_query(weighted, need=3, top=8)
+    group = q["query"]["stats"][0]
+    assert group["type"] == "count" and group["value"] == {"min": 3} and len(group["filters"]) == 8
+    assert "engine" not in q and q["sort"] == {"price": "asc"}
+    assert weighted["query"]["stats"][0]["type"] == "weight"

@@ -190,15 +190,40 @@ def _trade_request(method: str, url: str, **kwargs: Any) -> Any:
             _trade_next = time.monotonic() + delay
         if resp.status_code == 429 and attempt < 2:
             continue
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            try:
+                detail = resp.json()["error"]["message"]
+            except Exception:  # noqa: BLE001 - not a trade-site error body
+                detail = resp.text[:200]
+            raise ValueError(f"Trade site said {resp.status_code}: {detail}")
         return resp.json()
     raise RuntimeError("trade site rate limit")
 
 
-def trade_search(league: str, query: dict[str, Any], limit: int = 10) -> list[dict[str, Any]]:
-    """Run a trade search and fetch the first `limit` listings (best first, in the query's own sort order)."""
-    found = _trade_request("POST", f"{TRADE_API}/search/poe2/{quote(league)}", json=query)
-    ids = (found.get("result") or [])[:limit]
+def anonymous_query(query: dict[str, Any], need: int, top: int = 8) -> dict[str, Any]:
+    """The anonymous API refuses weighted-sum stat groups, so turn the weights into 'at least `need` of the `top`
+    most valuable mods', cheapest first. PoB does the real ranking afterwards."""
+    q = json.loads(json.dumps(query))
+    q.pop("engine", None)
+    q["sort"] = {"price": "asc"}
+    groups = q["query"].get("stats") or []
+    filters = groups[0].get("filters", []) if groups else []
+    mods = [{"id": f["id"]} for f in filters[:top]]
+    q["query"]["stats"] = [{"type": "count", "value": {"min": min(need, len(mods))}, "filters": mods}] if mods else []
+    return q
+
+
+def trade_search(league: str, query: dict[str, Any], limit: int = 10, wanted: int = 5) -> list[dict[str, Any]]:
+    """Search for `query` (a weighted gear query), relaxing 'at least N mods' from 3 down to 1 until `wanted`
+    listings match, and fetch the first `limit` listings, cheapest first."""
+    found: dict[str, Any] = {}
+    for need in (3, 2, 1):
+        found = _trade_request("POST", f"{TRADE_API}/search/poe2/{quote(league)}", json=anonymous_query(query, need))
+        if len(found.get("result") or []) >= wanted:
+            break
+    # Results come cheapest first, and the cheapest are rarely upgrades: sample evenly across the page instead.
+    pool = found.get("result") or []
+    ids = pool if len(pool) <= limit else [pool[round(i * (len(pool) - 1) / (limit - 1))] for i in range(limit)]
     out: list[dict[str, Any]] = []
     for i in range(0, len(ids), 10):
         batch = ids[i : i + 10]
