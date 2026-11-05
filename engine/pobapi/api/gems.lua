@@ -86,6 +86,12 @@ function M.advise(params)
 			for idx, gem in ipairs(group.gemList) do
 				local name = gem.gemData and gem.gemData.name or gem.nameSpec
 				local g = { index = idx, name = name, support = isSupport(gem) or false, level = gem.level, quality = gem.quality, enabled = gem.enabled ~= false, problems = util.array() }
+				-- Levels from items and jewels (Prism of Belief: "+3 to Level of all X Skills") on top of the gem's own.
+				local effective = gem.displayEffect and gem.displayEffect.level
+				if effective and gem.level and effective > gem.level then
+					g.effectiveLevel = effective
+					g.bonusLevels = effective - gem.level
+				end
 				if not gem.gemData then
 					g.problems[#g.problems + 1] = "Not recognised by PoB"
 				elseif gem.enabled == false then

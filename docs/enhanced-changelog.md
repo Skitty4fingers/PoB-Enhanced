@@ -20,6 +20,16 @@ are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
 ## Unreleased
 
+- **Jewel plan** (Jewels tab, `suggest_unique_jewels` -> `plan`): jewels are picked one after another and
+  re-measured with the earlier picks in place (Heart of the Well then Prism of Belief is worth far more than each
+  alone). Each unique is used once, a unique you already wear stays where it is, and Limited-to-1 uniques you wear are
+  no longer suggested for other sockets.
+- **Item-created jewel sockets** (e.g. gloves with Cadigan's Epiphany): listed on the Jewels tab and in `gear.slots`
+  as `itemSocket`. Only rare or magic jewels fit them (PoB and the game refuse uniques), so no unique is suggested
+  there, and the slot's trade search is for a rare jewel.
+- Gem advice shows levels added by items and jewels (`effectiveLevel`, `bonusLevels`), e.g. Prism of Belief's
+  "+3 to Level of all Grim Pillars Skills".
+
 - Merged upstream Path of Building PoE2 `dev` up to bb52d6b36 (rune mods, gem quality breakdowns, radius jewel and
   crash fixes, Geofri's Sanctuary and Sunken Vessel, updated 0.5 tree data). Our three `patches/` still apply and are
   still needed.

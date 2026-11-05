@@ -888,7 +888,28 @@ class PoBService:
                     row["tradeUrl"] = market.trade_url(league, market.unique_query(s["name"]))
                 rows.append(row)
             sockets.append({**sock, "suggestions": rows})
-        return {"metric": data["metric"], "league": league, "sockets": sockets}
+        plan = data.get("plan")
+        if plan:
+            steps = []
+            for step in plan["steps"]:
+                row = dict(step)
+                price = prices["items"].get(step["name"])
+                if price:
+                    row["priceDivine"] = price["divine"]
+                    row["price"] = market.format_price(price["divine"], prices["rates"])
+                if league:
+                    row["tradeUrl"] = market.trade_url(league, market.unique_query(step["name"]))
+                steps.append(row)
+            plan = {**plan, "steps": steps}
+        return {
+            "metric": data["metric"],
+            "league": league,
+            "sockets": sockets,
+            "itemSockets": data.get("itemSockets", []),
+            "worn": data.get("worn", {}),
+            "plan": plan,
+            "note": data.get("note"),
+        }
 
     def design_rare(
         self, slot: str, metric: str = "balanced", item_level: int = 82, league: str | None = None

@@ -623,7 +623,10 @@ def suggest_unique_jewels(
     league: Annotated[str | None, Field(description="Trade league for prices and links")] = None,
 ) -> dict[str, Any]:
     """Best unique jewels for each allocated jewel socket, every current variant tried (which skill, which god, ring
-    size...) and measured in place, so radius jewels count the nodes around that socket. With poe.ninja prices."""
+    size...) and measured in place, so radius jewels count the nodes around that socket. With poe.ninja prices.
+    Also returns 'plan' (jewels picked one after another, re-measured after each: use this, not the per-socket lists,
+    to decide what to buy), 'worn' (Limited-to-1 uniques already worn are not suggested again) and 'itemSockets'
+    (sockets an item creates, e.g. via Cadigan's Epiphany: rare or magic jewels only, never uniques)."""
     return svc().unique_jewels(metric, slot, league)
 
 

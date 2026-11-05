@@ -46,7 +46,7 @@ function SlotCard({ data, uniques, open, onToggle, metric, league }: { data: Gea
     <div className="panel">
       <button className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left" onClick={onToggle}>
         {open ? <ChevronDown size={14} className="text-ink-400" /> : <ChevronRight size={14} className="text-ink-400" />}
-        <span className="w-28 shrink-0 text-sm text-ink-400">{data.slot.replace(/^Jewel \d+$/, "Jewel socket")}</span>
+        <span className="w-28 shrink-0 text-sm text-ink-400">{data.itemSocket ? data.slot.replace(" Jewel Socket", " socket") : data.slot.replace(/^Jewel \d+$/, "Jewel socket")}</span>
         {data.item && <ItemArt item={data.item} size={28} className="shrink-0" />}
         <span className={`min-w-0 flex-1 truncate text-sm ${rarityColor(data.item?.rarity)}`}>{data.item?.name ?? <span className="text-ink-400">Empty{data.testBase ? ` (evaluated as ${data.testBase})` : ""}</span>}</span>
         {data.modsWorth && <span className="text-xs text-ink-400">mods worth <GainText g={data.modsWorth} compact /></span>}
@@ -83,6 +83,7 @@ function SlotCard({ data, uniques, open, onToggle, metric, league }: { data: Gea
                 {!data.unsupported && <TradeSearchButton target={{ title: data.slot, slot: data.slot, tradeUrl: data.tradeUrl }} metric={metric} league={league} />}
               </span>
             </div>
+            {data.itemSocket && <p className="mb-1.5 text-xs text-rare">Made by an item: only rare or magic jewels fit here, never uniques.</p>}
             {data.unsupported ? <p className="text-sm text-ink-400">PoB can't weight trade searches for this slot.</p> : (
               <ol className="space-y-0.5 text-sm">
                 {data.lookFor?.map((l) => (
@@ -154,6 +155,7 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
       )}
       {pending > 0 && <p className="text-xs text-ink-400">Analysing {pending} more slot{pending > 1 ? "s" : ""}…</p>}
       {jewels && sockets.isLoading && <p className="text-xs text-ink-400">Trying every unique jewel and variant in each socket (about a minute the first time)…</p>}
+      {jewels && sockets.data && <JewelPlan data={sockets.data} metric={metric} league={league} />}
       {jewels && sockets.data && <JewelHighlights data={sockets.data} metric={metric} league={league} />}
       {ranked.map((d) => (
         <SlotCard key={d.slot} data={d} uniques={uniqueFor(d.slot)} open={open === d.slot} onToggle={() => setOpen(open === d.slot ? null : d.slot)} metric={metric} league={league} />
@@ -164,6 +166,41 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
 }
 
 /** The single best unique jewel across sockets, so a great cheap pick (like a 1 ex Prism of Belief) stands out. */
+function JewelPlan({ data, metric, league }: { data: JewelSockets; metric: Metric; league?: string }) {
+  const steps = data.plan?.steps ?? [];
+  if (!steps.length) return null;
+  const total = data.plan?.total;
+  return (
+    <div className="panel space-y-2 border-l-4 border-l-unique px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <Sparkles size={16} className="text-unique" />
+        <span className="font-semibold text-ink-200">Jewel plan</span>
+        <span className="text-xs text-ink-400">picked one after another, re-measured with the earlier picks in place; each unique used once</span>
+        {total && <span className="ml-auto text-xs">together: <GainText g={total} /></span>}
+      </div>
+      <ol className="space-y-1">
+        {steps.map((s, i) => (
+          <li key={s.slot} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="w-5 text-ink-400">{i + 1}.</span>
+            <span className="text-unique">{s.name}</span>
+            {s.variant && <span className="text-gold-soft">({s.variant})</span>}
+            <span className="text-ink-400">in {s.slot.replace(/^Jewel \d+$/, "a socket")}{s.replaces ? ` instead of ${s.replaces}` : ""}:</span>
+            <GainText g={s} />
+            {s.price && <span className="text-ink-400">· {s.price}</span>}
+            <span className="ml-auto"><TradeSearchButton compact target={{ title: s.name, slot: s.slot, unique: { name: s.name }, tradeUrl: s.tradeUrl }} metric={metric} league={league} /></span>
+          </li>
+        ))}
+      </ol>
+      {data.itemSockets?.length ? (
+        <p className="text-xs text-ink-400">
+          {data.itemSockets.map((x) => x.slot.replace(" Jewel Socket", " socket")).join(", ")}: rare or magic jewels only (uniques can't go in sockets an item creates), so none of these fit there.
+        </p>
+      ) : null}
+      <p className="text-xs text-ink-400">Measured at average rolls: a better roll does more. Prism of Belief rolls +1 to +3 skill levels.</p>
+    </div>
+  );
+}
+
 function JewelHighlights({ data, metric, league }: { data: JewelSockets; metric: Metric; league?: string }) {
   const all = data.sockets.flatMap((s) => s.suggestions.map((u) => ({ ...u, socket: s.slot, current: s.current })));
   if (!all.length) return null;
@@ -539,6 +576,7 @@ function GemsSection({ metric }: { metric: Metric }) {
               <span className="font-semibold text-gold-soft">{g.skills[0] ?? g.label}</span>
               {g.skills.length > 1 && <span className="truncate text-xs text-ink-400">+ {g.skills.slice(1).join(", ")}</span>}
               {g.isMain && <span className="rounded bg-gold/15 px-1.5 text-xs text-gold-soft">main</span>}
+              {(() => { const a = g.gems.find((x) => !x.support && x.bonusLevels); return a ? <span className="text-xs text-good" title="Levels from items and jewels on top of the gem's own">Lv {a.effectiveLevel} (+{a.bonusLevels} from items)</span> : null; })()}
               <span className="ml-auto text-xs text-ink-400" title="Damage skills are measured on their own DPS; utility skills on what they do for your build">
                 {g.measuredOn === "skill" ? "its own DPS" : "build"}
               </span>

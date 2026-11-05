@@ -169,10 +169,34 @@ export interface DesignedRare {
   note: string;
 }
 
+export interface JewelPlanStep {
+  slot: string;
+  name: string;
+  variant?: string;
+  replaces?: string;
+  dpsPercent: number;
+  ehpPercent: number;
+  lifeDelta?: number;
+  esDelta?: number;
+  totemsDelta?: number;
+  spiritDelta?: number;
+  score: number;
+  price?: string;
+  priceDivine?: number;
+  tradeUrl?: string;
+}
+
 export interface JewelSockets {
   metric: string;
   league?: string;
   sockets: { slot: string; nodeId: number; current?: string; suggestions: UniqueSuggestion[] }[];
+  /** Sockets an item creates (Cadigan's Epiphany): rare or magic jewels only. */
+  itemSockets?: { slot: string; parent: string; current?: string; currentRarity?: string; rule: string }[];
+  /** Limited-to-1 uniques already worn, by name -> socket. */
+  worn?: Record<string, string>;
+  /** Jewels picked one after another, re-measured after each. */
+  plan?: { steps: JewelPlanStep[]; total?: Gain };
+  note?: string;
 }
 
 export interface Finding {
@@ -496,6 +520,7 @@ export interface GearMod extends Gain {
 export interface GearSlotRef {
   slot: string;
   jewel?: boolean;
+  itemSocket?: boolean;
   nodeId?: number;
   item?: { name: string; rarity: string; baseName: string };
 }
@@ -504,6 +529,7 @@ export interface GearSlot {
   slot: string;
   metric: string;
   jewel?: boolean;
+  itemSocket?: boolean;
   item?: { name: string; rarity: string; baseName: string; title?: string };
   modsWorth?: Gain;
   mods?: GearMod[];
@@ -600,6 +626,9 @@ export interface GemAdviceGem {
   name: string;
   support: boolean;
   level?: number;
+  /** Level after items and jewels add theirs (Prism of Belief); only set when higher than `level`. */
+  effectiveLevel?: number;
+  bonusLevels?: number;
   quality?: number;
   enabled: boolean;
   problems: string[];

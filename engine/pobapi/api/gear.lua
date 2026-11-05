@@ -81,6 +81,18 @@ local function emptySlotBase(b, name)
 	return baseType and baseType ~= "" and bestBase(baseType) or nil
 end
 
+-- Jewel sockets created by an item (a rune that "creates a Jewel Socket"): "Gloves Jewel Socket 1". Only active when
+-- the parent item has that many. PoB's IsItemValidForSlot lets only non-unique jewels into them.
+local function itemSocketActive(b, name)
+	local parent, index = name:match("^(.-) Jewel Socket (%d+)$")
+	if not parent then
+		return false
+	end
+	local slot = b.itemsTab.slots[parent]
+	local item = slot and b.itemsTab.items[slot.selItemId]
+	return item ~= nil and (item.jewelSocketCount or 0) >= tonumber(index), parent
+end
+
 -- Equipment slots worth advising on, plus allocated jewel sockets.
 local function adviceSlots(b)
 	local list = { }
@@ -90,6 +102,10 @@ local function adviceSlots(b)
 		if slot.nodeId then
 			if b.spec.allocNodes[slot.nodeId] then
 				list[#list + 1] = { slot = slot, name = name, item = item, jewel = true, base = item and item.baseName or "Sapphire" }
+			end
+		elseif name:find(" Jewel Socket %d") then
+			if itemSocketActive(b, name) then
+				list[#list + 1] = { slot = slot, name = name, item = item, jewel = true, itemSocket = true, base = item and item.baseName or "Sapphire" }
 			end
 		elseif item and not name:match("^Flask") and not name:find("Socket") then
 			list[#list + 1] = { slot = slot, name = name, item = item, base = item.baseName }
@@ -110,6 +126,7 @@ function M.slots()
 		res[#res + 1] = {
 			slot = s.name,
 			jewel = s.jewel or nil,
+			itemSocket = s.itemSocket or nil,
 			nodeId = s.slot.nodeId,
 			item = s.item and { name = s.item.name, rarity = s.item.rarity, baseName = s.item.baseName } or nil,
 		}
@@ -258,7 +275,7 @@ function M.slot(params)
 		util.fail("Unknown or unadvisable slot: " .. name)
 	end
 	local calcFunc, baseOutput, measure = measurer(b, metric)
-	local res = { slot = name, metric = metric, jewel = target.jewel or nil, testBase = not target.item and target.base or nil }
+	local res = { slot = name, metric = metric, jewel = target.jewel or nil, itemSocket = target.itemSocket or nil, testBase = not target.item and target.base or nil }
 	if target.item then
 		local it = target.item
 		res.item = { name = it.name, rarity = it.rarity, baseName = it.baseName, title = it.title }
@@ -381,6 +398,41 @@ local function variantCopy(item, v, alts)
 	return copy
 end
 
+-- The copy of a jewel to place: its best variant (and extra picks for multi-pick jewels), or a plain copy.
+local function makeItem(j, v)
+	if j.multi > 0 and j.best and j.best.v then
+		return variantCopy(j.item, j.best.v, j.best.alts)
+	end
+	if v then
+		return variantCopy(j.item, v)
+	end
+	return new("Item"):Item(j.item:BuildRaw())
+end
+
+local function variantLabel(j, v)
+	if j.picks and #j.picks > 0 then
+		local labels = { }
+		for _, pick in ipairs(j.picks) do labels[#labels + 1] = j.item.variantList[pick] end
+		return table.concat(labels, " + ")
+	elseif v then
+		return j.item.variantList[v]
+	end
+end
+
+-- Sockets that items create: only non-unique jewels fit, so no unique is suggested for them.
+local function listItemSockets(b, params)
+	local list = util.array()
+	for _, slot in ipairs(b.itemsTab.orderedSlots) do
+		local active, parent = itemSocketActive(b, slot.slotName)
+		if active and (not params.slot or params.slot == slot.slotName) then
+			local cur = b.itemsTab.items[slot.selItemId]
+			list[#list + 1] = { slot = slot.slotName, parent = parent, current = cur and cur.name or nil,
+				currentRarity = cur and cur.rarity or nil, rule = "Rare or magic jewels only: PoB (and the game) refuse unique jewels in sockets an item creates." }
+		end
+	end
+	return list
+end
+
 function M.jewels(params)
 	params = params or { }
 	local b = session.build()
@@ -394,7 +446,7 @@ function M.jewels(params)
 		end
 	end
 	if #sockets == 0 then
-		return { metric = metric, sockets = util.array() }
+		return { metric = metric, sockets = util.array(), itemSockets = listItemSockets(b, params), worn = { } }
 	end
 	local skillNames = { }
 	for _, group in ipairs(b.skillsTab.socketGroupList) do
@@ -466,12 +518,22 @@ function M.jewels(params)
 		end
 	end
 
+	-- Uniques already worn ("Limited to: 1" jewels can't be worn twice), in tree sockets and item-granted sockets.
+	local worn = { }
+	for _, slot in ipairs(b.itemsTab.orderedSlots) do
+		local it = b.itemsTab.items[slot.selItemId]
+		if it and it.type == "Jewel" and it.rarity == "UNIQUE" and it.title then
+			worn[it.title] = slot.slotName
+		end
+	end
+	local bestScore = { }
 	local res = util.array()
 	for _, slot in ipairs(sockets) do
 		local current = b.itemsTab.items[slot.selItemId]
 		local rows = { }
 		for _, j in ipairs(jewels) do
-			if j.best and b.itemsTab:IsItemValidForSlot(j.item, slot.slotName) and not (current and current.title == j.name) then
+			local usedElsewhere = j.item.limit and worn[j.name] and worn[j.name] ~= slot.slotName
+			if j.best and not usedElsewhere and b.itemsTab:IsItemValidForSlot(j.item, slot.slotName) and not (current and current.title == j.name) then
 				local tries = (j.radius and #j.variants > 0 and j.multi == 0) and j.variants or { false }
 				local top
 				for _, v in ipairs(tries) do
@@ -484,13 +546,9 @@ function M.jewels(params)
 				if top and top.r.score >= DEAD then
 					local r = top.r
 					r.name = j.name
-					if j.picks and #j.picks > 0 then
-						local labels = { }
-						for _, v in ipairs(j.picks) do labels[#labels + 1] = j.item.variantList[v] end
-						r.variant = table.concat(labels, " + ")
-					elseif top.v then
-						r.variant = j.item.variantList[top.v]
-					end
+					r.variant = variantLabel(j, top.v)
+					r.limited = j.item.limit or nil
+					bestScore[j.name] = math.max(bestScore[j.name] or -math.huge, r.score)
 					rows[#rows + 1] = r
 				end
 			end
@@ -500,7 +558,90 @@ function M.jewels(params)
 		for i = 1, math.min(limit, #rows) do kept[i] = rows[i] end
 		res[#res + 1] = { slot = slot.slotName, nodeId = slot.nodeId, current = current and current.name or nil, suggestions = kept }
 	end
-	return { metric = metric, sockets = res }
+
+	local itemSockets = listItemSockets(b, params)
+	local out = { metric = metric, sockets = res, itemSockets = itemSockets, worn = worn,
+		note = "Each jewel is measured alone against your current build at average rolls (a better roll does more). Limited-to-1 uniques you already wear are not suggested again. The plan picks jewels one after another and re-measures after each." }
+	if params.plan ~= false and #sockets > 1 then
+		out.plan = M._jewelPlan(b, metric, sockets, jewels, bestScore, worn, tonumber(params.maxSteps) or #sockets, tonumber(params.minGain) or 0.5)
+	end
+	return out
+end
+
+-- Greedy combined plan: put the best (socket, jewel) in, re-measure everything with it in place, repeat. Each unique is
+-- used once and each socket once; the build is restored afterwards.
+function M._jewelPlan(b, metric, sockets, jewels, bestScore, worn, maxSteps, minGain)
+	local byName, short = { }, { }
+	for _, j in ipairs(jewels) do byName[j.name] = j end
+	for name in pairs(bestScore) do short[#short + 1] = name end
+	table.sort(short, function(x, y) return bestScore[x] > bestScore[y] end)
+	while #short > 8 do table.remove(short) end
+
+	local saved, added = { }, { }
+	local function restore()
+		for _, it in ipairs(added) do b.itemsTab:DeleteItem(it, true) end
+		for slotName, orig in pairs(saved) do b.itemsTab.slots[slotName]:SetSelItemId(orig) end
+		b.itemsTab:PopulateSlots()
+		session.recalc()
+	end
+	local steps, total = util.array(), nil
+	local usedSocket, usedName = { }, { }
+	for name in pairs(worn) do usedName[name] = true end
+	-- A unique you already wear stays where it is.
+	for _, slot in ipairs(sockets) do
+		local cur = b.itemsTab.items[slot.selItemId]
+		if cur and cur.rarity == "UNIQUE" then usedSocket[slot.slotName] = true end
+	end
+	local ok, err = pcall(function()
+		for _ = 1, maxSteps do
+			local calcFunc, _, measure = measurer(b, metric)
+			local best
+			for _, slot in ipairs(sockets) do
+				if not usedSocket[slot.slotName] then
+					for _, name in ipairs(short) do
+						local j = byName[name]
+						if j.best and not usedName[name] and b.itemsTab:IsItemValidForSlot(j.item, slot.slotName) then
+							local tries = (j.radius and #j.variants > 0 and j.multi == 0) and j.variants or { false }
+							for _, v in ipairs(tries) do
+								local item = makeItem(j, v or j.best.v)
+								local good, r = pcall(function() return measure(calcFunc({ repSlotName = slot.slotName, repItem = item })) end)
+								if good and (not best or r.score > best.r.score) then
+									best = { slot = slot, j = j, v = v or j.best.v, r = r }
+								end
+							end
+						end
+					end
+				end
+			end
+			if not best or best.r.score < minGain then
+				break
+			end
+			local before = b.itemsTab.items[best.slot.selItemId]
+			local item = makeItem(best.j, best.v)
+			b.itemsTab:AddItem(item, true)
+			added[#added + 1] = item
+			if saved[best.slot.slotName] == nil then saved[best.slot.slotName] = best.slot.selItemId end
+			best.slot:SetSelItemId(item.id)
+			session.recalc()
+			usedSocket[best.slot.slotName] = true
+			usedName[best.j.name] = true
+			local r = best.r
+			steps[#steps + 1] = { slot = best.slot.slotName, name = best.j.name, variant = variantLabel(best.j, best.v),
+				replaces = before and before.name or nil, score = r.score, dpsPercent = r.dpsPercent, ehpPercent = r.ehpPercent,
+				lifeDelta = r.lifeDelta, esDelta = r.esDelta, totemsDelta = r.totemsDelta, spiritDelta = r.spiritDelta }
+		end
+		if #steps > 0 then
+			local finalOut = b.calcsTab.mainOutput
+			restore()
+			local _, _, measureFromStart = measurer(b, metric)
+			total = measureFromStart(finalOut)
+		end
+	end)
+	restore()
+	if not ok then
+		error(err, 0)
+	end
+	return { steps = steps, total = total }
 end
 
 M._metricOf = metricOf
