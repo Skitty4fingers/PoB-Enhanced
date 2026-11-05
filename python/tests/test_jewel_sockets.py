@@ -56,3 +56,12 @@ def test_worn_limited_unique_not_suggested_again(build):
     names = {row["name"] for sock in res["sockets"] for row in sock["suggestions"]}
     assert "Heart of the Well" not in names
     assert "plan" not in res
+
+
+def test_plan_with_empty_sockets_uses_each_unique_once(build):
+    # Regression: multi-pick uniques (Heart of the Well, Megalomaniac) crashed the plan when copied with a single pick.
+    res = build.call("gear.jewels", metric="balanced", limit=4)
+    steps = res["plan"]["steps"]
+    assert steps and len({s["name"] for s in steps}) == len(steps)
+    assert len({s["slot"] for s in steps}) == len(steps)
+    assert res["plan"]["total"]["score"] > 0

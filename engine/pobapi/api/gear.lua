@@ -400,8 +400,12 @@ end
 
 -- The copy of a jewel to place: its best variant (and extra picks for multi-pick jewels), or a plain copy.
 local function makeItem(j, v)
-	if j.multi > 0 and j.best and j.best.v then
-		return variantCopy(j.item, j.best.v, j.best.alts)
+	if j.multi > 0 then
+		-- Multi-pick jewels need every alt variant set; a single pick repeats itself.
+		local base = (j.best and j.best.v) or v
+		if base then
+			return variantCopy(j.item, base, (j.best and j.best.alts) or { base, base })
+		end
 	end
 	if v then
 		return variantCopy(j.item, v)
