@@ -283,6 +283,10 @@ modified, and a patch upstream has absorbed is skipped with a warning. `worker.p
 - **Design best rare** keeps the slot's base, quality, sockets, runes and implicits, takes the top tier of each mod
   family that can roll at the item level, and picks up to 3 prefixes and 3 suffixes greedily, each measured with
   PoB's calculator. The trade search asks for all but one of the chosen stats.
+- **Trade searches** (`shop_search`, `best_in_shop`, `POST /api/gear/shop`) call the trade site's anonymous API, which
+  refuses weighted-sum queries, so a slot's weights become "at least N of the top 8 mods" (N from 3 down to 1),
+  sampled from cheap to dear. Each listing is converted to item text and run through `check_item`; `buyNow` swaps the
+  status to `securable` (instant buyout). Requests are serialised and spaced out, and back off on 429.
 - **Unique jewels** tries every unique jewel and current variant per allocated socket. Skill-choice jewels only try
   the build's own skills, multi-pick jewels fill their picks greedily, and radius jewels are re-tried per socket.
 
@@ -324,7 +328,8 @@ Everything is measured in your build by PoB (Balanced = DPS% + EHP%, or Damage /
 
 - **Gear / Jewels**: per slot, what the item and each mod is worth (dead mods flagged; mods holding up an attribute
   requirement are marked as needed), what to look for on a replacement (PoB's trade stat weighting at average rolls),
-  the headroom a good replacement would add, and a weighted pathofexile.com trade search. Empty slots are evaluated
+  the headroom a good replacement would add, and a trade search (live listings measured in your build; the weighted
+  pathofexile.com search is the fallback link). Empty slots are evaluated
   with an endgame base (a focus behind a one-handed caster weapon, a quiver behind a bow, otherwise a shield).
 - **Gems**: what each support is worth (secondary damage skills on their own DPS, utility skills on the build), the
   best replacement for the weakest support per skill (regular, plus the best lineage support), gem level/quality

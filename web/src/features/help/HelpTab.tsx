@@ -154,12 +154,12 @@ const SECTIONS: Section[] = [
         <p>Everything in Upgrades is measured in your build. Pick Balanced (DPS% + EHP%), Damage or Defence at the top.</p>
         <Points
           items={[
-            <><Term>Check item</Term>: paste any item (Ctrl+C in game or from trade) for an upgrade / sidegrade / downgrade verdict. It checks every damage skill, totems, Spirit, attribute requirements and skills the swap would remove. <Term>Do this before buying anything.</Term></>,
-            <><Term>Gear</Term>: what each item and mod is worth (dead mods flagged), what to look for on a replacement, and a weighted trade search. <Term>Design best rare</Term> builds the best rare for the slot from the real mod pool, measured in your build, with a trade search for it.</>,
+            <><Term>Check item</Term>: paste any item (Ctrl+C in game or from trade) for an upgrade / sidegrade / downgrade verdict. It checks every damage skill, totems, Spirit, attribute requirements and skills the swap would remove. Click a skill to see why its damage changes. <Term>Do this before buying anything.</Term></>,
+            <><Term>Gear</Term>: what each item and mod is worth (dead mods flagged), what to look for on a replacement, and <Term>Search trade</Term>, which shows what is actually listed now, each listing measured in your build (seller details, copy whisper, a Buy now only filter). <Term>Design best rare</Term> builds the best rare for the slot from the real mod pool, measured in your build, with a trade search for it.</>,
             <><Term>Jewels</Term>: the same for jewels, plus the best unique jewels for each socket with the variant to buy (for example Prism of Belief rolled for your main skill).</>,
             <><Term>Sockets</Term>: what each rune, soul core and idol is worth and the best legal replacements. It respects corruption, level, per-item limits and character-wide limits (for example Ancient Augment). <Term>Build plan</Term> gives an ordered list of swaps measured together.</>,
             <><Term>Gems</Term>: what each support is worth, the best swap for the weakest one, and level/quality upgrades. One click applies a suggestion.</>,
-            <><Term>Shop</Term>: uniques that would help most, with poe.ninja prices and a budget filter.</>,
+            <><Term>Shop</Term>: uniques that would help most, with poe.ninja prices and a budget filter. <Term>Best in shop</Term> searches real listings (rares too) and keeps only the upgrades.</>,
           ]}
         />
         <Open tab="upgrades">Open Upgrades</Open>

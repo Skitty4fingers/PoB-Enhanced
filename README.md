@@ -36,20 +36,30 @@ named copies.
 
 **Upgrades**
 - **Check before you buy**: paste any item for an upgrade / sidegrade / downgrade verdict across every damage skill,
-  with warnings for lost totems, Spirit shortfalls, attribute requirements and skills the swap removes.
+  with warnings for lost totems, Spirit shortfalls, attribute requirements and skills the swap removes. **Click a
+  skill** to see why its damage changes: the mod lines of the replaced item that carry it, what the new item brings
+  back, and the stats that moved.
 - **Gear and jewels**: what each item and each mod is worth (dead mods flagged), what to look for on a replacement,
-  how much room for improvement each slot has, and a weighted pathofexile.com trade search per slot.
+  and how much room for improvement each slot has. **Search trade** (on a slot, a unique or a designed rare) shows
+  what is actually listed right now, each listing measured in your build: verdict, DPS and EHP change, price, seller
+  details (account, character, online status, how long ago it was listed, stash tab) and a copy-whisper button, with
+  a **Buy now only** filter for instant-buyout listings and the trade site one click away.
 - **Design best rare**: builds the best rare for a slot from the real mod pool (top tiers at your item level, one
   mod per family), each mod measured in your build, with a trade search for items like it.
 - **Unique jewels per socket**: every unique jewel and variant tried in each of your sockets (Prism of Belief for
-  your main skill, Megalomaniac's best notables, radius jewels on the nodes around that socket), with prices.
+  your main skill, Megalomaniac's best notables, radius jewels on the nodes around that socket), with prices. A
+  **jewel plan** picks them one after another and re-measures with the earlier picks in place, using each unique
+  once and never suggesting a Limited-to-1 unique you already wear. Sockets an item creates (Cadigan's Epiphany) take
+  rare or magic jewels only, so no unique is suggested there.
 - **Sockets**: what each rune, soul core and idol is worth and the best legal replacement per socket, respecting
   corruption, level, per-item and character-wide limits (such as Ancient Augment). **Build plan** orders the swaps
   and measures them together, including paired swaps that free a limit.
 - **Gems**: what each support is worth, the best replacement for the weakest support in each skill, gem level and
-  quality upgrades, and problems like disabled or harmful supports. One click applies a suggestion.
+  quality upgrades, and problems like disabled or harmful supports. Levels added by items and jewels are shown. One
+  click applies a suggestion.
 - **Shop**: every unique that fits a slot, measured in your build, with poe.ninja prices, a budget filter and
-  "best value for money".
+  "best value for money". **Best in shop** searches the trade site for what is really listed (rares too) for the
+  slots with the most room, measures every listing in your build and keeps only the real upgrades.
 
 **Spirit and totems.** PoB reports totem damage per totem and doesn't model Ancestral Bond's Spirit cost per totem.
 PoB-Enhanced tracks your Spirit budget and the totems you can actually keep up (including totem limit bonuses that
@@ -74,10 +84,10 @@ Config settings. Item art (GGG's official icons, via poe.ninja) shows on items, 
 or stat.
 
 **Upstream fixes.** Path of Building bugs that change the numbers, such as slam builds losing the whole Fist of War
-boost, are fixed by small patches applied to copies of the affected files at start-up; `src/` stays exactly as
+boost or a Sceptre swap silently dropping your off hand, are fixed by small patches applied to copies of the affected files at start-up; `src/` stays exactly as
 upstream ships it ([patches/](patches/README.md)).
 
-**AI agents (MCP).** About 60 tools let Claude or any MCP client load, inspect, what-if and edit builds, using the
+**AI agents (MCP).** About 65 tools let Claude or any MCP client load, inspect, what-if and edit builds, using the
 same advisors as the UI, plus a PoE2 knowledge library (points per level, gem tiers, Spirit, caps) from
 [PoB Redux](https://github.com/pobredux/pob-redux). The web UI and an agent share one live build, and everything an
 agent does can be undone.
