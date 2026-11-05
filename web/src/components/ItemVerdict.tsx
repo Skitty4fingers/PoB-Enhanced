@@ -52,6 +52,9 @@ function ExplainPanel({ check, group }: { check: ItemCheck; group: number }) {
             {d.skill}: {fmtNum(d.before)} → {fmtNum(d.after)}{d.percent !== undefined && d.percent !== null ? ` (${signed(d.percent)})` : ""}
             {d.totemsBefore !== undefined && d.totemsAfter !== undefined && d.totemsBefore !== d.totemsAfter ? `, totems ${d.totemsBefore} → ${d.totemsAfter}` : ""}
           </p>
+          {d.approximate && (
+            <p className="text-xs text-rare"><AlertTriangle size={12} className="mr-1 inline" />PoB couldn’t rebuild one of these items exactly, so the line shares below are approximate.</p>
+          )}
           <div>
             <div className="label mb-1">{drop ? "What you lose from" : "Damage carried by"} {d.replaces ?? "the current item"}</div>
             <Lines rows={d.lost} empty="None of its lines changes this skill’s damage." />

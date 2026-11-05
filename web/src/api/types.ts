@@ -281,6 +281,8 @@ export interface ItemExplain {
   totemsAfter?: number;
   lost: ItemExplainLine[];
   gained: ItemExplainLine[];
+  /** The rebuilt item didn't reproduce the real one exactly, so the line shares are approximate. */
+  approximate?: boolean;
   moved: { key: string; label: string; before: number; after: number; percent: number; pct?: boolean }[];
 }
 

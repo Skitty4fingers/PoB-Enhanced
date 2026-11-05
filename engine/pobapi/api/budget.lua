@@ -512,32 +512,47 @@ local EXPLAIN_STATS = {
 	{ key = "TotalDPS", label = "Damage per second (one totem)" },
 }
 
+-- A copy of `item` without one mod line, rebuilt from its parsed lines (not re-parsed from text: round-tripping
+-- corrupted, runed or enchanted uniques through text changes what they do, which would blame every line).
+local function withoutLine(item, key, index)
+	local copy = setmetatable({ }, getmetatable(item))
+	for k, v in pairs(item) do copy[k] = v end
+	if key then
+		local lines = { }
+		for i, line in ipairs(item[key]) do
+			if i ~= index then lines[#lines + 1] = line end
+		end
+		copy[key] = lines
+	end
+	copy:BuildModList()
+	return copy
+end
+
+-- Returns the lines' worth and the control: the same rebuild with nothing removed, which must match the real item.
 local function lineWorth(b, calcFunc, ctx, group, slotName, item, fullDps)
+	local function dpsWith(copy)
+		local out = calcFunc({ mainSocketGroup = group, repSlotName = slotName, repItem = copy })
+		return M._effectiveDps(out, M._summarize(out, ctx, group))
+	end
+	local control = dpsWith(withoutLine(item))
 	local rows = util.array()
 	for _, key in ipairs(LINE_LISTS) do
 		for i, line in ipairs(item[key] or { }) do
 			if line.line and line.line ~= "" then
-				local copy = new("Item"):Item(item:BuildRaw())
-				copy:NormaliseQuality()
-				if copy[key] and copy[key][i] then
-					table.remove(copy[key], i)
-					copy:BuildAndParseRaw()
-					copy:BuildModList()
-					local out = calcFunc({ mainSocketGroup = group, repSlotName = slotName, repItem = copy })
-					local without = M._effectiveDps(out, M._summarize(out, ctx, group))
-					rows[#rows + 1] = {
-						text = util.strip(line.line),
-						kind = key:gsub("ModLines$", ""),
-						-- Share of the skill's damage this line provides: what removing it would cost.
-						percent = fullDps > 0 and (fullDps - without) / fullDps * 100 or 0,
-						without = without,
-					}
-				end
+				local without = dpsWith(withoutLine(item, key, i))
+				rows[#rows + 1] = {
+					text = util.strip(line.line),
+					kind = key:gsub("ModLines$", ""),
+					-- Share of the skill's damage this line provides: what removing it would cost.
+					percent = control > 0 and (control - without) / control * 100 or 0,
+					without = without,
+				}
 			end
 		end
 	end
 	table.sort(rows, function(a, c) return math.abs(a.percent) > math.abs(c.percent) end)
-	return rows
+	-- A rebuild that doesn't reproduce the real item (more than 1% off) makes the shares approximate.
+	return rows, fullDps > 0 and math.abs(control - fullDps) / fullDps > 0.01 or false
 end
 
 local function keepSignificant(rows, limit)
@@ -575,8 +590,13 @@ function M.explain_item(params)
 	local current = b.itemsTab.items[b.itemsTab.slots[slotName].selItemId]
 
 	-- The current item's lines: what you lose. The new item's lines: what you get.
-	local lost = current and keepSignificant(lineWorth(b, calcFunc, ctx, group, slotName, current, eb), 8) or util.array()
-	local gained = keepSignificant(lineWorth(b, calcFunc, ctx, group, slotName, item, ea), 6)
+	local lost, lostApprox = util.array(), false
+	if current then
+		local rows, approx = lineWorth(b, calcFunc, ctx, group, slotName, current, eb)
+		lost, lostApprox = keepSignificant(rows, 8), approx
+	end
+	local gainedRows, gainedApprox = lineWorth(b, calcFunc, ctx, group, slotName, item, ea)
+	local gained = keepSignificant(gainedRows, 6)
 
 	-- The stats that make up the skill's damage, when they moved.
 	local moved = util.array()
@@ -605,6 +625,7 @@ function M.explain_item(params)
 		totemsAfter = sa.totems,
 		lost = lost,
 		gained = gained,
+		approximate = (lostApprox or gainedApprox) or nil,
 		moved = moved,
 	}
 end
