@@ -20,6 +20,8 @@ are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
 ## Unreleased
 
+- Item check: replacing an item that grants a skill (Sacred Flame's Purity of Fire) no longer reports the skill as lost
+  when the new item grants it too.
 - **Jewel plan** (Jewels tab, `suggest_unique_jewels` -> `plan`): jewels are picked one after another and
   re-measured with the earlier picks in place (Heart of the Well then Prism of Belief is worth far more than each
   alone). Each unique is used once, a unique you already wear stays where it is, and Limited-to-1 uniques you wear are

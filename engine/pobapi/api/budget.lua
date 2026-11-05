@@ -140,12 +140,28 @@ function M._effectiveDps(output, summary)
 	return dps
 end
 
+-- Does `item` itself grant the skill an item-granted socket group holds? (Replacing Sacred Flame with another item
+-- that also grants Purity of Fire keeps Purity of Fire.)
+function M._itemGrants(item, group)
+	local id = group.gemList and group.gemList[1] and group.gemList[1].skillId
+	if not (item and id) then
+		return false
+	end
+	for _, granted in ipairs(item.grantedSkills or { }) do
+		if granted.skillId == id then
+			return true
+		end
+	end
+	return false
+end
+
 -- Run fn with the skills granted by the item in `slotName` switched off: they disappear when that item is replaced
--- (e.g. Sacred Flame's Purity of Fire), but PoB's what-if calculator keeps them unless told otherwise.
-function M._withoutGrantedSkills(b, slotName, fn)
+-- (e.g. Sacred Flame's Purity of Fire), but PoB's what-if calculator keeps them unless told otherwise. Skills the
+-- replacement `newItem` grants as well stay on.
+function M._withoutGrantedSkills(b, slotName, fn, newItem)
 	local disabled = { }
 	for _, group in ipairs(b.skillsTab.socketGroupList) do
-		if group.sourceItem and group.slot == slotName and group.enabled ~= false then
+		if group.sourceItem and group.slot == slotName and group.enabled ~= false and not M._itemGrants(newItem, group) then
 			group.enabled = false
 			disabled[#disabled + 1] = group
 		end
@@ -166,7 +182,7 @@ function M._calculator(b)
 	local function calc(override, ...)
 		if override and override.repSlotName and override.repItem then
 			local args = { ... }
-			return M._withoutGrantedSkills(b, override.repSlotName, function() return rawCalc(override, unpack(args)) end)
+			return M._withoutGrantedSkills(b, override.repSlotName, function() return rawCalc(override, unpack(args)) end, override.repItem)
 		end
 		return rawCalc(override, ...)
 	end
@@ -393,7 +409,7 @@ function M.check_item(params)
 			local after = calcFunc({ mainSocketGroup = gi, repSlotName = best.slot, repItem = item })
 			local sb, sa = M._summarize(before, ctx, gi), M._summarize(after, ctx, gi)
 			local eb, ea = M._effectiveDps(before, sb), M._effectiveDps(after, sa)
-			local lost = group.sourceItem and group.slot == best.slot
+			local lost = group.sourceItem and group.slot == best.slot and not M._itemGrants(item, group)
 			if lost then
 				ea = 0
 			end
@@ -426,7 +442,7 @@ function M.check_item(params)
 
 	local lostSkills = util.array()
 	for _, group in ipairs(b.skillsTab.socketGroupList) do
-		if group.sourceItem and group.slot == best.slot and group.enabled ~= false and group.displaySkillList and group.displaySkillList[1] then
+		if group.sourceItem and group.slot == best.slot and group.enabled ~= false and group.displaySkillList and group.displaySkillList[1] and not M._itemGrants(item, group) then
 			local ge = group.displaySkillList[1].activeEffect.grantedEffect
 			lostSkills[#lostSkills + 1] = ge and ge.name or "?"
 		end
