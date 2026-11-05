@@ -302,7 +302,8 @@ PoB reports a totem skill's DPS **per totem**, reserves Ancestral Bond's "75 Spi
 parse "Your Totem Limit is doubled". On its own it therefore can't show that a weapon with less Spirit costs totems.
 PoB-Enhanced adds a Spirit/totem budget on top of PoB's outputs (`engine/pobapi/api/budget.lua`):
 
-- totem cap = PoB's limit, doubled for Ancestral Bond while PoB doesn't apply it (detected at runtime)
+- totem cap = PoB's limit (plus bonuses Spell Totem's override drops), doubled in full for Ancestral Bond while PoB
+  doesn't apply it (detected at runtime)
 - totems kept up = min(cap, Spirit available ÷ Spirit per totem), or the Config tab's "# of Summoned Totems"
 - **DPS, all totems** = per-totem DPS × totems kept up. Every advisor (tree, gear, shop, gems, guide) scores with it,
   so anything that costs totems or Spirit shows up as lost damage, with `totemsDelta` / `spiritDelta` on each row

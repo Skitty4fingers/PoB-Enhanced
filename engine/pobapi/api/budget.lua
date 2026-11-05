@@ -97,12 +97,12 @@ function M._summarize(output, ctx, group)
 		local parts = ctx.totemLimits[group] or { extra = 0 }
 		local extra = parts.extra or 0
 		local base = parts.overridden and limit or math.max(limit - extra, 0)
-		if ctx.ancestralBond and not doublingHandledByPoB() then
-			-- The order of "Totem Limit is doubled" and flat additions is not documented. In game, Spell Totem (2)
-			-- with Unnamed Heartwood (+1) and Ancestral Bond places 5 = 2 x 2 + 1, so only the base is doubled.
-			base = base * 2
-		end
 		local cap = base + extra
+		if ctx.ancestralBond and not doublingHandledByPoB() then
+			-- "Your Totem Limit is doubled" doubles the whole limit: Spell Totem (2) with Unnamed Heartwood (+1)
+			-- and Ancestral Bond places 6 = (2 + 1) x 2.
+			cap = cap * 2
+		end
 		-- Config "# of Summoned Totems" may say more than PoB works out (e.g. mods it does not parse), and fewer.
 		local wanted = cap
 		if ctx.configuredTotems and ctx.configuredTotems > 0 then

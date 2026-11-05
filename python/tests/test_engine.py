@@ -443,7 +443,7 @@ UNNAMED_HEARTWOOD, ANCESTRAL_BOND = 52374, 45202
 
 
 def test_budget_spell_totem_cap(service):
-    # Spell Totem OVERRIDEs the totem limit to 2, which drops Unnamed Heartwood's +1; in game this places 5 (2 x 2 + 1).
+    # Spell Totem OVERRIDEs the totem limit to 2, which drops Unnamed Heartwood's +1; in game the doubled limit is 6 ((2 + 1) x 2).
     service.new_build("Druid", "Oracle", 90)
     service.call("tree.allocate", ids=[UNNAMED_HEARTWOOD, ANCESTRAL_BOND])
     service.call(
@@ -453,16 +453,16 @@ def test_budget_spell_totem_cap(service):
     service.call("config.custom_mods", text="+296 to Spirit")
     budget = service.budget()
     assert budget["ancestralBond"] and budget["spirit"] == 396
-    assert (budget["totemCap"], budget["totems"], budget["free"]) == (5, 5, 21)
+    assert (budget["totemCap"], budget["totems"], budget["free"]) == (6, 5, 21)
     # Totems stay out when another skill is the main skill: Spirit still counts all five.
     service.call("skills.add", gems=["Fireball"], makeMain=True)
     other = service.budget()
     assert "totems" not in other and other["free"] == 21
     service.call("skills.set_main", group=1)
     # "# of Summoned Totems" can raise the cap; Spirit still limits the totems.
-    service.call("config.set", values={"TotemsSummoned": 6})
+    service.call("config.set", values={"TotemsSummoned": 7})
     budget = service.budget()
-    assert (budget["totemCap"], budget["totems"], budget["spiritLimited"]) == (6, 5, True)
+    assert (budget["totemCap"], budget["totems"], budget["spiritLimited"]) == (7, 5, True)
     service.call("config.set", values={"TotemsSummoned": 3})
     assert service.budget()["totems"] == 3
 
