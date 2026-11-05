@@ -1,6 +1,6 @@
 [project]
 name = "pob2-enhanced"
-version = "0.2.2"
+version = "0.2.3"
 description = "Headless Path of Building 2 engine bridge: MCP server, REST API and web UI."
 readme = "README.md"
 license = "MIT"

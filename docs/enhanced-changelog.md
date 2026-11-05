@@ -3,7 +3,7 @@
 Versions of the enhanced layer (engine API, MCP server, REST API, web UI). The upstream Path of Building changes
 are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
-## Unreleased
+## 0.2.3 (2026-11-05)
 
 - Item check returns `unsupported`, the mod lines PoB can't parse, as its comments always said it did (it was computed
   but never returned). Its test now uses a genuinely unparseable line.
