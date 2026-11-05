@@ -19,5 +19,7 @@ once upstream has the fix.
 | `poe2/0002-Fix-Node-Power-…` | Node Power cached one score per modKey, giving nodes inside a radius jewel or on a weapon set another node's score |
 | `poe2/0003-Fix-the-Trader-…` | The trader looked up `recipes` instead of `recipe`, so every Megalomaniac listing scored as no change |
 
-These three come from [PoB Redux](https://github.com/pobredux/pob-redux) (`patches/poe2/`), MIT licence,
+| `poe2/0004-Do-not-treat-Sceptres-…` | A what-if with a Sceptre in Weapon 1 dropped the off hand (PoB treats weapon types missing from `data.weaponTypeInfo` as two-handed), so swapping a Sceptre for an identical one cost a spell build its Focus: about half its damage on a Threaded Light build |
+
+Patches 0001-0003 come from [PoB Redux](https://github.com/pobredux/pob-redux) (`patches/poe2/`), MIT licence,
 Copyright (c) 2026 Judd.

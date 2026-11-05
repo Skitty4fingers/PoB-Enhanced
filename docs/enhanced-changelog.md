@@ -20,6 +20,13 @@ are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
 ## Unreleased
 
+- **Fixed: item checks dropped your off hand.** Putting a Sceptre in Weapon 1 in a what-if made PoB ignore the Focus (it
+  treats weapon types missing from its table as two-handed), so checking a Sceptre against your own cost a spell build
+  roughly half its damage, chaos resistance and Energy Shield, and every Sceptre verdict was too harsh. New upstream
+  fix `patches/poe2/0004`. The patch loader now also covers files PoB loads with `require` (CalcSetup), which it
+  silently skipped before.
+- Explain: each mod line is measured on a parsed copy of the item with a control run, and flagged approximate when the
+  copy doesn't reproduce the real item.
 - **Why did this skill change?** Click a skill row in the item check to see the mod lines of the replaced item that carry
   its damage (what you lose), the new item's lines that bring some back, and the stats that moved (damage per hit by
   type, speed, crit). New `explain_item_change` MCP tool and `POST /api/items/explain`; the REST check now echoes the

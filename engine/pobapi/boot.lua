@@ -33,6 +33,17 @@ function M.usePatchedFiles()
 		local path = name and overlay[name:gsub("\\", "/"):gsub("^%./", "")]
 		return l_loadfile(path or name, ...)
 	end
+	-- Files PoB pulls in with require("Modules.CalcSetup") never go through loadfile; preload the patched copy for them.
+	for rel, path in pairs(overlay) do
+		local modname = rel:gsub("%.lua$", ""):gsub("/", ".")
+		package.preload[modname] = function(...)
+			local chunk, err = l_loadfile(path)
+			if not chunk then
+				error(err, 0)
+			end
+			return chunk(...)
+		end
+	end
 end
 
 function M.start()
