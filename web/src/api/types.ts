@@ -165,6 +165,7 @@ export interface DesignedRare {
   gain: { score: number; dpsPercent: number; ehpPercent: number };
   openAffixes: { prefixes: number; suffixes: number };
   tradeUrl?: string;
+  tradeQuery?: Record<string, unknown>;
   note: string;
 }
 
@@ -537,29 +538,57 @@ export interface UniquesAdvice {
   slots: { slot: string; items: UniqueSuggestion[] }[];
 }
 
+export interface ShopSeller {
+  account?: string | null;
+  character?: string | null;
+  /** "online", "afk", or absent when offline (instant-buyout sellers need not be online). */
+  status?: string | null;
+  language?: string | null;
+  listed?: string | null;
+  method?: string | null;
+  /** "~b/o" (buyout), "~price" (asking price), "~fixed" ... */
+  priceType?: string | null;
+  stash?: string | null;
+  position?: [number, number] | null;
+  whisper?: string | null;
+  buyNow: boolean;
+  listedPrice?: string | null;
+}
+
 export interface ShopListing {
   slot: string;
   group?: string;
   name: string;
   baseName?: string;
+  icon?: string;
   replaces?: string;
+  verdict: "upgrade" | "sidegrade" | "downgrade";
   dpsPercent: number;
   ehpPercent: number;
   gain: number;
   price?: string | null;
   priceDivine?: number | null;
   gainPerDivine?: number | null;
-  seller?: string;
-  online?: string;
-  whisper?: string;
+  seller: ShopSeller;
   warnings: string[];
   reasons: string[];
   itemText: string;
 }
 
+export interface ShopSearchResult {
+  league: string;
+  slot?: string | null;
+  buyNow: boolean;
+  maxPrice?: number | null;
+  tradeUrl: string;
+  searched: number;
+  listings: ShopListing[];
+}
+
 export interface BestInShop {
   league: string;
   maxPrice?: number | null;
+  buyNow: boolean;
   best: ShopListing[];
   slots: { slot: string; headroom?: number; items: ShopListing[] }[];
   searched: { slot: string; listings: number; upgrades: number; tradeUrl?: string }[];

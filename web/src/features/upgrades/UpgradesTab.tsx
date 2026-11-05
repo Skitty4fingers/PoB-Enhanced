@@ -1,14 +1,15 @@
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, ChevronRight, CircleDot, ClipboardCheck, ExternalLink, Gem, HeartPulse, Link2, ListOrdered, Lock, Search, ShoppingCart, Shirt, Sparkles } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, CircleDot, ClipboardCheck, Gem, HeartPulse, Link2, ListOrdered, Lock, ShoppingCart, Shirt, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, qs } from "../../api/client";
 import { useBuildMutation } from "../../api/hooks";
-import type { BestInShop as BestInShopResult, ShopListing, Gain, GearSlot, GearSlotRef, GemAdvice, JewelSockets, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
+import type { Gain, GearSlot, GearSlotRef, GemAdvice, JewelSockets, ItemCheck, SocketAdvice, SocketOption, SocketPlan, SocketSlot, UniqueSuggestion, UniquesAdvice } from "../../api/types";
 import { ErrorText } from "../../components/ErrorText";
 import { ItemArt } from "../../components/ItemArt";
 import { ItemVerdict } from "../../components/ItemVerdict";
 import { Modal } from "../../components/Modal";
 import { DesignerButton } from "./DesignerDialog";
+import { BestInShop, TradeSearchButton } from "./ShopSearch";
 import { HealthSection } from "./HealthSection";
 
 type Metric = "balanced" | "dps" | "ehp";
@@ -36,15 +37,6 @@ function GainText({ g, compact }: { g?: Pick<Gain, "dpsPercent" | "ehpPercent"> 
   if (g.spiritDelta && !compact) parts.push(<span key="p" className={tone(g.spiritDelta)}>{g.spiritDelta > 0 ? "+" : ""}{Math.round(g.spiritDelta)} Spirit</span>);
   if (!parts.length) return <span className="text-ink-400">no measured change</span>;
   return <span className="inline-flex flex-wrap gap-x-2">{parts}</span>;
-}
-
-function TradeLink({ url, label = "Search trade" }: { url?: string; label?: string }) {
-  if (!url) return null;
-  return (
-    <a className="btn" href={url} target="_blank" rel="noreferrer" title="Opens pathofexile.com trade (sign in there to buy)">
-      <Search size={13} /> {label} <ExternalLink size={11} />
-    </a>
-  );
 }
 
 // -- gear & jewels ------------------------------------------------------------------------------------------
@@ -88,7 +80,7 @@ function SlotCard({ data, uniques, open, onToggle, metric, league }: { data: Gea
               <span className="label">Look for on a replacement</span>
               <span className="ml-auto flex gap-1">
                 {data.item && !/^Jewel/.test(data.slot) && !/^(Flask|Charm)/.test(data.slot) && <DesignerButton slot={data.slot} metric={metric} league={league} />}
-                <TradeLink url={data.tradeUrl} />
+                {!data.unsupported && <TradeSearchButton target={{ title: data.slot, slot: data.slot, tradeUrl: data.tradeUrl }} metric={metric} league={league} />}
               </span>
             </div>
             {data.unsupported ? <p className="text-sm text-ink-400">PoB can't weight trade searches for this slot.</p> : (
@@ -104,7 +96,7 @@ function SlotCard({ data, uniques, open, onToggle, metric, league }: { data: Gea
             {uniques?.length ? (
               <div className="mt-3">
                 <div className="label mb-1">Uniques that would help</div>
-                <UniqueRows rows={uniques.slice(0, 4)} />
+                <UniqueRows rows={uniques.slice(0, 4)} metric={metric} league={league} />
               </div>
             ) : null}
           </div>
@@ -154,7 +146,7 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
             <span className="text-good">+{best.headroom.toFixed(1)}%</span>
             {best.lookFor?.length ? <span className="text-ink-400">. Look for {best.lookFor.slice(0, 3).map((l) => l.text).join(", ")}.</span> : null}
           </div>
-          <TradeLink url={best.tradeUrl} />
+          <TradeSearchButton primary target={{ title: best.slot, slot: best.slot, tradeUrl: best.tradeUrl }} metric={metric} league={league} />
         </div>
       )}
       {jewels && emptySockets > 0 && (
@@ -162,7 +154,7 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
       )}
       {pending > 0 && <p className="text-xs text-ink-400">Analysing {pending} more slot{pending > 1 ? "s" : ""}…</p>}
       {jewels && sockets.isLoading && <p className="text-xs text-ink-400">Trying every unique jewel and variant in each socket (about a minute the first time)…</p>}
-      {jewels && sockets.data && <JewelHighlights data={sockets.data} />}
+      {jewels && sockets.data && <JewelHighlights data={sockets.data} metric={metric} league={league} />}
       {ranked.map((d) => (
         <SlotCard key={d.slot} data={d} uniques={uniqueFor(d.slot)} open={open === d.slot} onToggle={() => setOpen(open === d.slot ? null : d.slot)} metric={metric} league={league} />
       ))}
@@ -172,7 +164,7 @@ function GearSection({ jewels, metric, league, uniques }: { jewels: boolean; met
 }
 
 /** The single best unique jewel across sockets, so a great cheap pick (like a 1 ex Prism of Belief) stands out. */
-function JewelHighlights({ data }: { data: JewelSockets }) {
+function JewelHighlights({ data, metric, league }: { data: JewelSockets; metric: Metric; league?: string }) {
   const all = data.sockets.flatMap((s) => s.suggestions.map((u) => ({ ...u, socket: s.slot, current: s.current })));
   if (!all.length) return null;
   const best = all.reduce((a, b) => (b.score > a.score ? b : a));
@@ -187,7 +179,7 @@ function JewelHighlights({ data }: { data: JewelSockets }) {
         <GainText g={best} />
         {best.price && <span className="text-ink-400"> · {best.price}</span>}
       </div>
-      {best.tradeUrl && <TradeLink url={best.tradeUrl} />}
+      <TradeSearchButton target={{ title: best.name, slot: best.socket, unique: { name: best.name }, tradeUrl: best.tradeUrl }} metric={metric} league={league} />
     </div>
   );
 }
@@ -242,7 +234,7 @@ function CheckSection() {
 
 // -- shop ---------------------------------------------------------------------------------------------------
 
-function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: boolean }) {
+function UniqueRows({ rows, showSlot, metric, league }: { rows: UniqueSuggestion[]; showSlot?: boolean; metric: Metric; league?: string }) {
   return (
     <table className="w-full text-sm">
       <tbody>
@@ -260,75 +252,13 @@ function UniqueRows({ rows, showSlot }: { rows: UniqueSuggestion[]; showSlot?: b
             <td className="whitespace-nowrap text-right">
               <span className="inline-flex items-center gap-2">
                 {!u.variant && <CheckUniqueButton name={u.name} baseName={u.baseName} />}
-                {u.tradeUrl && <a className="text-gold hover:underline" href={u.tradeUrl} target="_blank" rel="noreferrer" title="Search trade"><ShoppingCart size={14} /></a>}
+                <TradeSearchButton compact target={{ title: u.name, slot: u.slot, unique: { name: u.name, baseName: u.baseName }, tradeUrl: u.tradeUrl }} metric={metric} league={league} />
               </span>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
-  );
-}
-
-function ListingRow({ l }: { l: ShopListing }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <tr className="border-t border-ink-800 align-top">
-      <td className="py-1.5 pr-2">
-        <div className="text-rare">{l.name}</div>
-        <div className="text-xs text-ink-400">{l.baseName} · {l.group ?? l.slot}{l.replaces ? ` · replaces ${l.replaces}` : ""}</div>
-        {l.warnings.map((w) => <div key={w} className="text-xs text-warn"><AlertTriangle size={11} className="mr-1 inline" />{w}</div>)}
-      </td>
-      <td className="pr-2 text-xs"><GainText g={l} /></td>
-      <td className="whitespace-nowrap pr-2 text-right tabular-nums">
-        <div className="text-ink-200">{l.price ?? "price?"}</div>
-        <div className="text-xs text-ink-400">{l.online ?? ""}</div>
-      </td>
-      <td className="whitespace-nowrap text-right">
-        <span className="inline-flex items-center gap-2">
-          <button className="text-gold hover:underline" title="Copy whisper to buy" disabled={!l.whisper}
-            onClick={() => { void navigator.clipboard?.writeText(l.whisper ?? "").then(() => setCopied(true)); }}>
-            {copied ? "copied" : "whisper"}
-          </button>
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-/** Searches the real trade site for the slots with most headroom and keeps only the listings PoB says are upgrades. */
-function BestInShop({ metric, league, maxPrice }: { metric: Metric; league?: string; maxPrice?: number }) {
-  const run = useMutation({
-    mutationFn: () => api.get<BestInShopResult>(`/gear/best-in-shop${qs({ metric, league, maxPrice })}`),
-  });
-  const d = run.data;
-  return (
-    <div className="panel space-y-3 border-l-4 border-l-unique p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <button className="btn btn-primary" disabled={run.isPending} onClick={() => run.mutate()}>
-          <Sparkles size={14} /> {run.isPending ? "Searching trade…" : "Best in shop"}
-        </button>
-        <span className="text-xs text-ink-400">
-          Checks what is listed right now (rares too) for your top upgrade slots, and keeps only real upgrades{maxPrice ? ` up to ${maxPrice} div` : ""}. Takes up to a minute.
-        </span>
-      </div>
-      <ErrorText error={run.error} />
-      {d && (
-        <>
-          {d.best.length === 0 && <p className="text-sm text-ink-400">No listed item beat your current gear in the {d.searched.length} slot(s) searched{d.maxPrice ? ` within ${d.maxPrice} div` : ""}.</p>}
-          {d.best.length > 0 && (
-            <table className="w-full text-sm"><tbody>{d.best.map((l) => <ListingRow key={l.group + l.name + l.seller} l={l} />)}</tbody></table>
-          )}
-          {d.slots.filter((s) => s.items.length > 1).map((s) => (
-            <details key={s.slot} className="text-sm">
-              <summary className="cursor-pointer text-ink-400">More for {s.slot} ({s.items.length - 1})</summary>
-              <table className="w-full text-sm"><tbody>{s.items.slice(1).map((l) => <ListingRow key={l.name + l.seller} l={l} />)}</tbody></table>
-            </details>
-          ))}
-          {d.errors.length > 0 && <p className="text-xs text-bad">Trade search failed for {d.errors.map((e) => `${e.slot} (${e.error})`).join(", ")}</p>}
-        </>
-      )}
-    </div>
   );
 }
 
@@ -354,19 +284,19 @@ function ShopSection({ uniques, loading, error, budget, setBudget, metric, leagu
       {deals.length > 0 && (
         <div className="panel p-4">
           <div className="label mb-2">Best value for money</div>
-          <UniqueRows rows={deals} showSlot />
+          <UniqueRows rows={deals} showSlot metric={metric} league={league} />
         </div>
       )}
       <div className="grid gap-3 lg:grid-cols-2">
         {uniques?.slots.map((s) => (
           <div key={s.slot} className="panel p-4">
             <div className="label mb-1">{s.slot}</div>
-            <UniqueRows rows={s.items} />
+            <UniqueRows rows={s.items} metric={metric} league={league} />
           </div>
         ))}
       </div>
       <p className="text-xs text-ink-400">
-        Rare upgrades: open <b>Gear</b> or <b>Jewels</b> and use <b>Search trade</b>. The searches are weighted by what each stat is worth to this build.
+        Rare upgrades: use <b>Best in shop</b> above, or open <b>Gear</b> or <b>Jewels</b> and use <b>Search trade</b>. Searches look for the stats that matter most to this build.
       </p>
     </div>
   );

@@ -51,3 +51,25 @@ def test_anonymous_query_replaces_weights_with_a_count_group() -> None:
     assert group["type"] == "count" and group["value"] == {"min": 3} and len(group["filters"]) == 8
     assert "engine" not in q and q["sort"] == {"price": "asc"}
     assert weighted["query"]["stats"][0]["type"] == "weight"
+
+
+def test_seller_info_flags_instant_buyout_and_position() -> None:
+    listing = {
+        "indexed": "2026-11-04T05:00:44Z",
+        "method": "psapi",
+        "price": {"type": "~b/o", "amount": 1, "currency": "aug"},
+        "stash": {"name": "2", "x": 6, "y": 5},
+        "fee": 5,
+        "account": {"name": "Seller#1234", "lastCharacterName": "Char", "online": {"status": "afk"}},
+    }
+    info = market.seller_info(listing)
+    assert info["buyNow"] is True and info["whisper"] is None
+    assert info["position"] == [7, 6] and info["status"] == "afk" and info["listedPrice"] == "1 aug"
+    assert market.seller_info({"whisper": "@x hi", "account": {}})["buyNow"] is False
+
+
+def test_with_status_switches_between_online_and_securable() -> None:
+    query = {"query": {"status": {"option": "online"}}}
+    assert market.with_status(query, True)["query"]["status"] == {"option": "securable"}
+    assert market.with_status(query, False)["query"]["status"] == {"option": "online"}
+    assert query["query"]["status"] == {"option": "online"}

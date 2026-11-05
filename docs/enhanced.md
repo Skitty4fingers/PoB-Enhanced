@@ -189,7 +189,7 @@ Setup for ChatGPT (Codex CLI and the ChatGPT app), Gemini (Antigravity, Gemini C
 | Config | `list_config`, `set_config`, `set_custom_mods` |
 | Guide | `load_reference_build`, `compare_to_reference`, `reference_impact`, `apply_reference_tree` |
 | Advisor | `get_advice`, `set_attribute_nodes` |
-| Upgrades | `gear_advice`, `shopping_advice`, `gem_advice`, `socket_advice`, `design_rare`, `suggest_unique_jewels`, `set_gem`, `refresh_build` |
+| Upgrades | `gear_advice`, `shopping_advice`, `best_in_shop`, `shop_search`, `gem_advice`, `socket_advice`, `design_rare`, `suggest_unique_jewels`, `set_gem`, `refresh_build` |
 | Budget | `check_item`, `get_budget`, `build_check` |
 | History | `undo`, `redo`, `get_history`, `checkpoint`, `restore_history` |
 | Saved builds | `save_build`, `list_saved_builds`, `open_saved_build`, `delete_saved_build` |
@@ -224,6 +224,8 @@ GET  /api/advisor?metric=balanced|dps|ehp next point, point to move, attribute n
 POST /api/tree/attributes   {changes}     set +5 Str/Dex/Int on attribute nodes
 GET  /api/gear/slots | /api/gear/slot?slot=&metric=&league=   item/mod worth, what to look for, trade URL
 GET  /api/gear/uniques?metric=&league=&maxPrice=          uniques ranked per slot, poe.ninja prices
+GET  /api/gear/best-in-shop?metric=&league=&maxPrice=&slots=&buyNow=   real trade listings that are upgrades
+POST /api/gear/shop {slot|query|unique, metric, league, maxPrice, buyNow, limit}   live listings for one search
 GET  /api/gems/advice?metric=               support worth, swaps, level/quality upgrades, problems
 GET  /api/sockets?metric=&slot=&limit=     rune/soul core/idol worth and best legal replacements per socket
 GET  /api/sockets/plan?metric=&maxSwaps=   combined socket swap plan (greedy, re-measured; nothing is changed)

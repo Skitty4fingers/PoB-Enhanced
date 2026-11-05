@@ -714,6 +714,101 @@ class PoBService:
                 out.append({"slot": group["slot"], "items": items[:8]})
         return {"league": league, "rates": prices["rates"], "slots": out}
 
+    def _trade_rates(self, league: str) -> dict[str, float]:
+        try:
+            return market.unique_prices(league)["rates"]
+        except Exception:  # noqa: BLE001 - only used to convert non-divine prices
+            return {}
+
+    def _measure_listings(
+        self, entries: list[dict[str, Any]], slot: str | None, metric: str, rates: dict[str, float]
+    ) -> list[dict[str, Any]]:
+        """Run every trade listing through check_item and describe it (verdict, gain, price, seller)."""
+        rows = []
+        for entry in entries:
+            item = entry.get("item") or {}
+            listing = entry.get("listing") or {}
+            text = market.listing_text(item)
+            try:
+                check = self.check_item(text, slot if slot and not slot.startswith("Ring") else None)
+            except Exception:  # noqa: BLE001 - unparsable listing: skip it
+                continue
+            main = next((s for s in check["skills"] if s.get("isMain")), None)
+            dps = (main or {}).get("percent") or 0.0
+            ehp = check["defence"]["TotalEHP"]
+            ehp_pct = (ehp["after"] / ehp["before"] - 1) * 100 if ehp["before"] else 0.0
+            gain = dps if metric == "dps" else ehp_pct if metric == "ehp" else dps + ehp_pct
+            price = market.listing_price(listing, rates)
+            price_div = None if price is None else round(price, 3)
+            rows.append(
+                {
+                    "slot": check["slot"],
+                    "name": item.get("name") or item.get("typeLine"),
+                    "baseName": item.get("baseType"),
+                    "icon": item.get("icon"),
+                    "replaces": check.get("replaces"),
+                    "verdict": check["verdict"],
+                    "dpsPercent": dps,
+                    "ehpPercent": ehp_pct,
+                    "gain": gain,
+                    "priceDivine": price_div,
+                    "price": market.format_price(price, rates)
+                    if price is not None
+                    else market.seller_info(listing)["listedPrice"],
+                    "gainPerDivine": gain / price_div if price_div else None,
+                    "seller": market.seller_info(listing),
+                    "warnings": check["warnings"],
+                    "reasons": check["reasons"],
+                    "itemText": text,
+                }
+            )
+        return rows
+
+    def shop_search(
+        self,
+        slot: str | None = None,
+        query: dict[str, Any] | None = None,
+        unique: dict[str, str | None] | None = None,
+        metric: str = "balanced",
+        league: str | None = None,
+        max_price: float | None = None,
+        buy_now: bool = False,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """What is really listed right now for a slot / weighted query / unique, each listing measured in the build.
+
+        Rares use the slot's weighted trade query (turned into an anonymous-API friendly one), uniques are searched by
+        name. `buy_now` restricts to instant-buyout listings. Upgrades come first, best gain first."""
+        league = self.league(league)
+        if not league:
+            raise ValueError("No trade league available (poe.ninja unreachable?) - pass a league")
+        weighted = not unique
+        if unique:
+            query = market.unique_query(unique["name"] or "", unique.get("baseName"))
+        elif query is None:
+            if not slot:
+                raise ValueError("Pass a slot, a trade query or a unique")
+            query = self.gear_slot(slot, metric, league).get("tradeQuery")
+            if not query:
+                raise ValueError("PoB can't weight trade searches for this slot")
+        query = market.with_status(market.with_max_price(query, max_price), buy_now)
+        rates = self._trade_rates(league)
+        entries = market.trade_search(league, query, limit, weighted=weighted)
+        rows = self._measure_listings(entries, slot, metric, rates)
+        order = {"upgrade": 0, "sidegrade": 1, "downgrade": 2}
+        rows.sort(key=lambda r: (order.get(r["verdict"], 3), -r["gain"]))
+        return {
+            "league": league,
+            "slot": slot,
+            "metric": metric,
+            "buyNow": buy_now,
+            "maxPrice": max_price,
+            "rates": rates,
+            "tradeUrl": market.trade_url(league, query),
+            "searched": len(entries),
+            "listings": rows,
+        }
+
     def best_in_shop(
         self,
         metric: str = "balanced",
@@ -721,70 +816,35 @@ class PoBService:
         max_price: float | None = None,
         slots: int = 5,
         per_slot: int = 10,
+        buy_now: bool = False,
     ) -> dict[str, Any]:
         """Real trade-site listings (rares too) for the slots with most headroom, each measured in the build.
 
-        Per slot: the weighted trade search (online, optionally capped at `max_price` divine), the first `per_slot`
-        listings, each run through check_item. Only verdict 'upgrade' listings are kept, best first."""
+        Per slot: the slot's trade search (optionally capped at `max_price` divine, optionally instant buyout only),
+        the first `per_slot` listings, each run through check_item. Only verdict 'upgrade' listings are kept."""
         league = self.league(league)
         if not league:
             raise ValueError("No trade league available (poe.ninja unreachable?) - pass a league")
-        try:
-            rates = market.unique_prices(league)["rates"]
-        except Exception:  # noqa: BLE001 - only used to convert non-divine prices
-            rates = {}
+        rates = self._trade_rates(league)
         rows = [r for r in self.gear_overview(metric, league) if r.get("tradeQuery") and (r.get("headroom") or 0) > 0]
         searched, picks, errors = [], [], []
         for row in rows[: max(1, slots)]:
             slot = row["slot"]
+            query = market.with_status(market.with_max_price(row["tradeQuery"], max_price), buy_now)
             try:
-                listings = market.trade_search(league, market.with_max_price(row["tradeQuery"], max_price), per_slot)
+                entries = market.trade_search(league, query, per_slot)
             except Exception as exc:  # noqa: BLE001 - one slot failing must not lose the others
                 errors.append({"slot": slot, "error": str(exc)})
                 continue
-            good = []
-            for entry in listings:
-                item = entry.get("item") or {}
-                listing = entry.get("listing") or {}
-                try:
-                    check = self.check_item(market.listing_text(item), slot if not slot.startswith("Ring") else None)
-                except Exception:  # noqa: BLE001 - unparsable listing: skip it
-                    continue
-                main = next((s for s in check["skills"] if s.get("isMain")), None)
-                dps = (main or {}).get("percent") or 0.0
-                ehp = check["defence"]["TotalEHP"]
-                ehp_pct = (ehp["after"] / ehp["before"] - 1) * 100 if ehp["before"] else 0.0
-                gain = dps if metric == "dps" else ehp_pct if metric == "ehp" else dps + ehp_pct
-                price = market.listing_price(listing, rates)
-                if check["verdict"] != "upgrade":
-                    continue
-                price_div = None if price is None else round(price, 3)
-                good.append(
-                    {
-                        "slot": check["slot"],
-                        "name": item.get("name") or item.get("typeLine"),
-                        "baseName": item.get("baseType"),
-                        "icon": item.get("icon"),
-                        "replaces": check.get("replaces"),
-                        "verdict": check["verdict"],
-                        "dpsPercent": dps,
-                        "ehpPercent": ehp_pct,
-                        "gain": gain,
-                        "priceDivine": price_div,
-                        "price": market.format_price(price, rates) if price is not None else None,
-                        "listedPrice": listing.get("price"),
-                        "whisper": listing.get("whisper"),
-                        "seller": (listing.get("account") or {}).get("name"),
-                        "online": ((listing.get("account") or {}).get("online") or {}).get("status"),
-                        "warnings": check["warnings"],
-                        "reasons": check["reasons"],
-                        "itemText": market.listing_text(item),
-                        "gainPerDivine": gain / price_div if price_div else None,
-                    }
-                )
+            good = [r for r in self._measure_listings(entries, slot, metric, rates) if r["verdict"] == "upgrade"]
             good.sort(key=lambda g: g["gain"], reverse=True)
             searched.append(
-                {"slot": slot, "listings": len(listings), "upgrades": len(good), "tradeUrl": row.get("tradeUrl")}
+                {
+                    "slot": slot,
+                    "listings": len(entries),
+                    "upgrades": len(good),
+                    "tradeUrl": market.trade_url(league, query),
+                }
             )
             picks.append({"slot": slot, "headroom": row.get("headroom"), "current": row.get("item"), "items": good[:5]})
         best = [p["items"][0] | {"group": p["slot"]} for p in picks if p["items"]]
@@ -793,6 +853,7 @@ class PoBService:
             "league": league,
             "metric": metric,
             "maxPrice": max_price,
+            "buyNow": buy_now,
             "rates": rates,
             "best": best,
             "slots": picks,

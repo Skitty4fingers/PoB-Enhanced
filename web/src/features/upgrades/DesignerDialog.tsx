@@ -1,11 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ClipboardCheck, Copy, ExternalLink, Search, Wand2 } from "lucide-react";
+import { ClipboardCheck, Copy, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { api, qs } from "../../api/client";
 import type { DesignedRare, ItemCheck } from "../../api/types";
 import { ErrorText } from "../../components/ErrorText";
 import { ItemVerdict } from "../../components/ItemVerdict";
 import { Modal } from "../../components/Modal";
+import { TradeSearchButton } from "./ShopSearch";
 
 type Metric = "balanced" | "dps" | "ehp";
 
@@ -66,7 +67,7 @@ function DesignerDialog({ slot, metric, league, onClose }: { slot: string; metri
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              {d.tradeUrl && <a className="btn btn-primary" href={d.tradeUrl} target="_blank" rel="noreferrer"><Search size={13} /> Search trade <ExternalLink size={11} /></a>}
+              {(d.tradeQuery || d.tradeUrl) && <TradeSearchButton primary target={{ title: `${slot} rare`, slot, query: d.tradeQuery, tradeUrl: d.tradeUrl }} metric={metric} league={league} />}
               <button className="btn" onClick={() => check.mutate(d.text)} disabled={check.isPending}><ClipboardCheck size={13} /> Check in my build</button>
               <button className="btn" onClick={() => { navigator.clipboard.writeText(d.text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>
                 <Copy size={13} /> {copied ? "Copied" : "Copy item text"}

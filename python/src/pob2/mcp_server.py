@@ -40,7 +40,8 @@ get_advice says where the next point goes, which point to move and which attribu
 BEFORE recommending that the user buy, equip or swap any item, call check_item and report its verdict, warnings
 (Spirit, totems, attribute requirements) and every damage skill. Never compare raw TotalDPS for totem skills: PoB
 reports totem DPS per totem; check_item/get_budget count the totems the Spirit budget can actually keep up.
-gear_advice, shopping_advice and gem_advice cover items, jewels, uniques to buy and gems; refresh_build re-imports.
+gear_advice, shopping_advice and gem_advice cover items, jewels, uniques to buy and gems; best_in_shop and shop_search
+measure what is really listed on the trade site (rares too); refresh_build re-imports.
 Stat values are PoB's calculated numbers for the current configuration (see list_config);
 enemy conditions and buffs in the config strongly affect DPS.
 Game facts PoB doesn't know (points per level, gem tiers, Spirit, caps) are in the library tool.
@@ -536,10 +537,28 @@ def best_in_shop(
     league: Annotated[str | None, Field(description="Trade league (default: the build's or current league)")] = None,
     max_price: Annotated[float | None, Field(description="Budget in divine orbs")] = None,
     slots: Annotated[int, Field(description="How many slots to search (most headroom first)", ge=1, le=10)] = 5,
+    buy_now: Annotated[bool, Field(description="Only instant-buyout listings (no whispering the seller)")] = False,
 ) -> dict[str, Any]:
     """Real, currently listed trade items (rares too) that are upgrades: searches the trade site for the slots with
-    most headroom, runs every listing through check_item and returns the best buys. Slow (~15-60s, rate limited)."""
-    return svc().best_in_shop(metric, league, max_price, slots)
+    most headroom, runs every listing through check_item and returns the best buys with seller details.
+    Slow (~15-60s, rate limited)."""
+    return svc().best_in_shop(metric, league, max_price, slots, buy_now=buy_now)
+
+
+@tool(READ)
+def shop_search(
+    slot: Annotated[str | None, Field(description="Slot to search (e.g. Gloves, Ring 1, Jewel 26196)")] = None,
+    unique: Annotated[str | None, Field(description="A unique's name to search instead of a slot")] = None,
+    base_name: Annotated[str | None, Field(description="Base type of that unique")] = None,
+    metric: Metric = "balanced",
+    league: Annotated[str | None, Field(description="Trade league (default: the build's or current league)")] = None,
+    max_price: Annotated[float | None, Field(description="Budget in divine orbs")] = None,
+    buy_now: Annotated[bool, Field(description="Only instant-buyout listings")] = False,
+) -> dict[str, Any]:
+    """Live trade listings for one slot or unique, each measured in the build (verdict, DPS/EHP change, price,
+    seller). Upgrades first. Run check_item on the item text before recommending a purchase."""
+    uniq = {"name": unique, "baseName": base_name} if unique else None
+    return svc().shop_search(slot, None, uniq, metric, league, max_price, buy_now)
 
 
 @tool(READ)

@@ -3,6 +3,21 @@
 Versions of the enhanced layer (engine API, MCP server, REST API, web UI). The upstream Path of Building changes
 are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
+## 0.2.1 (2026-11-05)
+
+- **Best in shop** (Shop tab, `best_in_shop` MCP tool, `/api/gear/best-in-shop`): searches the trade site for what is
+  actually listed (rares too) for the slots with most headroom, runs every listing through `check_item`, and keeps
+  the real upgrades. The anonymous trade API refuses weighted-sum queries, so the weights become "at least N of the
+  top mods", sampled from cheap to dear; PoB does the ranking.
+- Every **Search trade** button (gear and jewel slots, uniques, jewel highlight, rare designer) now opens a window
+  with live listings measured in the build, with "Open on trade site" as the fallback (`shop_search` MCP tool,
+  `POST /api/gear/shop`).
+- Seller details on every listing: account, character, online/AFK, how long ago it was listed, price type, stash
+  tab and position, and a copy-whisper button.
+- **Buy now only** filter (instant-buyout listings) on Best in shop and in the trade search window.
+- Totem cap: "Your Totem Limit is doubled" now doubles the whole limit ((2 + 1) x 2 = 6 for Spell Totem with Unnamed
+  Heartwood), not just the base.
+
 ## Unreleased
 
 - Merged upstream Path of Building PoE2 `dev` up to bb52d6b36 (rune mods, gem quality breakdowns, radius jewel and

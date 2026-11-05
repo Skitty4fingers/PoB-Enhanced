@@ -213,12 +213,49 @@ def anonymous_query(query: dict[str, Any], need: int, top: int = 8) -> dict[str,
     return q
 
 
-def trade_search(league: str, query: dict[str, Any], limit: int = 10, wanted: int = 5) -> list[dict[str, Any]]:
-    """Search for `query` (a weighted gear query), relaxing 'at least N mods' from 3 down to 1 until `wanted`
-    listings match, and fetch the first `limit` listings, cheapest first."""
+def with_status(query: dict[str, Any], buy_now: bool) -> dict[str, Any]:
+    """Copy of a trade query for online sellers, or, with `buy_now`, only instant-buyout ('securable') listings."""
+    q = json.loads(json.dumps(query))
+    q["query"]["status"] = {"option": "securable" if buy_now else "online"}
+    return q
+
+
+def seller_info(listing: dict[str, Any]) -> dict[str, Any]:
+    """Who is selling and how to reach them, from a trade listing."""
+    account = listing.get("account") or {}
+    price = listing.get("price") or {}
+    stash = listing.get("stash") or {}
+    return {
+        "account": account.get("name"),
+        "character": account.get("lastCharacterName"),
+        "status": (account.get("online") or {}).get("status"),
+        "language": account.get("language"),
+        "listed": listing.get("indexed"),
+        "method": listing.get("method"),
+        "priceType": price.get("type"),
+        "stash": stash.get("name"),
+        "position": [stash["x"] + 1, stash["y"] + 1] if "x" in stash and "y" in stash else None,
+        "whisper": listing.get("whisper"),
+        # Instant-buyout listings have no seller to whisper: the site takes a fee instead.
+        "buyNow": "fee" in listing,
+        "listedPrice": f"{price['amount']:g} {price['currency']}"
+        if "amount" in price and "currency" in price
+        else None,
+    }
+
+
+def trade_search(
+    league: str, query: dict[str, Any], limit: int = 10, wanted: int = 5, weighted: bool = True
+) -> list[dict[str, Any]]:
+    """Search `query` and fetch up to `limit` listings spread from cheapest to dearest.
+
+    A weighted gear query is turned into 'at least N of the top mods', relaxing N from 3 down to 1 until `wanted`
+    listings match. Any other query (a unique by name) is sent as it is."""
     found: dict[str, Any] = {}
-    for need in (3, 2, 1):
-        found = _trade_request("POST", f"{TRADE_API}/search/poe2/{quote(league)}", json=anonymous_query(query, need))
+    needs = (3, 2, 1) if weighted else (0,)
+    for need in needs:
+        body = anonymous_query(query, need) if weighted else query
+        found = _trade_request("POST", f"{TRADE_API}/search/poe2/{quote(league)}", json=body)
         if len(found.get("result") or []) >= wanted:
             break
     # Results come cheapest first, and the cheapest are rarely upgrades: sample evenly across the page instead.

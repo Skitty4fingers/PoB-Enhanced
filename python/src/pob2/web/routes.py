@@ -102,6 +102,17 @@ class ItemCheck(BaseModel):
     slot: str | None = Field(None, description="Slot to test in (default: where it does best)")
 
 
+class ShopSearch(BaseModel):
+    slot: str | None = Field(None, description="Slot to search for (uses its weighted trade query)")
+    query: dict[str, Any] | None = Field(None, description="A weighted trade query, e.g. from the rare designer")
+    unique: dict[str, str | None] | None = Field(None, description="{name, baseName} of a unique to search for")
+    metric: Literal["balanced", "dps", "ehp"] = "balanced"
+    league: str | None = None
+    maxPrice: float | None = Field(None, ge=0)  # noqa: N815 - JSON field name
+    buyNow: bool = False  # noqa: N815
+    limit: int = Field(10, ge=1, le=20)
+
+
 class ReferenceUpload(BaseModel):
     content: str = Field(description="Contents of a PoE2 BuildPlanner .build file (JSON)")
 
@@ -501,8 +512,17 @@ def best_in_shop(
     league: str | None = None,
     maxPrice: float | None = Query(None, ge=0),  # noqa: N803 - query parameter name
     slots: int = Query(5, ge=1, le=10),
+    buyNow: bool = False,  # noqa: N803
 ) -> Any:
-    return svc().best_in_shop(metric, league, maxPrice, slots)
+    return svc().best_in_shop(metric, league, maxPrice, slots, buy_now=buyNow)
+
+
+@router.post("/gear/shop")
+def gear_shop(body: ShopSearch) -> Any:
+    """Live trade listings for a slot, weighted query or unique, each measured in the build."""
+    return svc().shop_search(
+        body.slot, body.query, body.unique, body.metric, body.league, body.maxPrice, body.buyNow, body.limit
+    )
 
 
 @router.get("/market/leagues")
