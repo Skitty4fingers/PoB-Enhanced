@@ -511,6 +511,18 @@ def refresh_build() -> dict[str, Any]:
 
 
 @tool(READ)
+def explain_item_change(
+    text: Annotated[str, Field(description="Item text, as given to check_item")],
+    slot: Annotated[str, Field(description="Slot from check_item's result")],
+    group: Annotated[int, Field(description="Socket group of the skill, from check_item's skills[].group")],
+) -> dict[str, Any]:
+    """Why does this item change one skill's damage? Returns the mod lines of the replaced item that carry its damage
+    (what you lose), the new item's lines that bring some back, and the stats that moved (damage per hit by type,
+    speed, crit). Line shares overlap because damage multiplies. Use after check_item shows a big loss."""
+    return svc().explain_item(text, slot, group)
+
+
+@tool(READ)
 def gear_advice(
     slot: Annotated[str | None, Field(description="One slot (e.g. Gloves, Ring 1, Jewel 26196); omit for all")] = None,
     metric: Metric = "balanced",

@@ -1,5 +1,9 @@
-import { AlertTriangle, CheckCircle2, MinusCircle, XCircle } from "lucide-react";
-import type { ItemCheck } from "../api/types";
+import { useMutation } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, MinusCircle, XCircle } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { api } from "../api/client";
+import type { ItemCheck, ItemExplain, ItemExplainLine } from "../api/types";
+import { ErrorText } from "./ErrorText";
 import { fmtNum } from "./format";
 
 const STYLE = {
@@ -14,8 +18,77 @@ const DEFENCE_LABELS: Record<string, string> = {
   PhysicalMaximumHitTaken: "Phys max hit", LifeRegenRecovery: "Life regen",
 };
 
+const signed = (v: number, digits = 1) => `${v > 0 ? "+" : ""}${v.toFixed(digits)}%`;
+
+function Lines({ rows, empty }: { rows: ItemExplainLine[]; empty: string }) {
+  if (!rows.length) return <p className="text-xs text-ink-400">{empty}</p>;
+  return (
+    <ul className="space-y-1">
+      {rows.map((r) => (
+        <li key={r.kind + r.text} className="flex items-baseline gap-2">
+          <span className={`min-w-0 flex-1 ${r.kind === "implicit" || r.kind === "enchant" || r.kind === "rune" ? "italic text-ink-400" : "text-magic"}`}>{r.text}</span>
+          <span className="shrink-0 tabular-nums text-ink-200">{r.percent.toFixed(1)}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Why a skill's damage changes: the lines carrying it, what the new item brings back, and the stats that moved. */
+function ExplainPanel({ check, group }: { check: ItemCheck; group: number }) {
+  const explain = useMutation({
+    mutationFn: () => api.post<ItemExplain>("/items/explain", { text: check.itemText, slot: check.slot, group }),
+  });
+  useEffect(() => { explain.mutate(); }, [check.itemText, check.slot, group]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = explain.data;
+  const drop = d && d.percent !== undefined && d.percent < 0;
+  return (
+    <div className="space-y-3 rounded border border-ink-700 bg-ink-900 p-3 text-[13px]">
+      <ErrorText error={explain.error} />
+      {explain.isPending && <p className="text-ink-400">Measuring each mod line…</p>}
+      {d && (
+        <>
+          <p className="text-ink-200">
+            {d.skill}: {fmtNum(d.before)} → {fmtNum(d.after)}{d.percent !== undefined && d.percent !== null ? ` (${signed(d.percent)})` : ""}
+            {d.totemsBefore !== undefined && d.totemsAfter !== undefined && d.totemsBefore !== d.totemsAfter ? `, totems ${d.totemsBefore} → ${d.totemsAfter}` : ""}
+          </p>
+          <div>
+            <div className="label mb-1">{drop ? "What you lose from" : "Damage carried by"} {d.replaces ?? "the current item"}</div>
+            <Lines rows={d.lost} empty="None of its lines changes this skill’s damage." />
+          </div>
+          <div>
+            <div className="label mb-1">What {d.item} brings to this skill</div>
+            <Lines rows={d.gained} empty="None of its lines changes this skill’s damage." />
+          </div>
+          {d.moved.length > 0 && (
+            <div>
+              <div className="label mb-1">What changed in the skill</div>
+              <table className="w-full">
+                <tbody>
+                  {d.moved.map((m) => (
+                    <tr key={m.key}>
+                      <td className="pr-2 text-ink-200">{m.label}</td>
+                      <td className="pr-2 text-right tabular-nums text-ink-400">{fmtNum(m.before)}{m.pct ? "%" : ""} → {fmtNum(m.after)}{m.pct ? "%" : ""}</td>
+                      <td className={`w-16 text-right tabular-nums ${m.percent < 0 ? "text-bad" : "text-good"}`}>{signed(m.percent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-ink-400">
+            Each line is measured alone: its percentage is how much of the skill’s damage disappears if just that line is removed. Damage multiplies, so shares overlap and don’t add up to the total.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** "Check before you buy" result: verdict, warnings (Spirit, totems, requirements, lost skills), every damage skill. */
 export function ItemVerdict({ check }: { check: ItemCheck }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const canExplain = !!check.itemText;
   const st = STYLE[check.verdict];
   const changedDefence = Object.entries(check.defence).filter(([, v]) => Math.round(v.before) !== Math.round(v.after));
   return (
@@ -34,8 +107,12 @@ export function ItemVerdict({ check }: { check: ItemCheck }) {
       <table className="mt-2 w-full text-[13px]">
         <tbody>
           {check.skills.map((s) => (
-            <tr key={s.group} className="border-t border-ink-800">
+            <Fragment key={s.group}>
+            <tr className={`border-t border-ink-800 ${canExplain && !s.lost ? "cursor-pointer hover:bg-ink-800/40" : ""}`}
+              onClick={canExplain && !s.lost ? () => setOpen(open === s.group ? null : s.group) : undefined}
+              title={canExplain && !s.lost ? "Click to see why this skill's damage changes" : undefined}>
               <td className="py-1 pr-2">
+                {canExplain && !s.lost && (open === s.group ? <ChevronDown size={12} className="mr-1 inline text-ink-400" /> : <ChevronRight size={12} className="mr-1 inline text-ink-400" />)}
                 <span className={s.isMain ? "text-gold-soft" : "text-ink-200"}>{s.name}</span>
                 {s.isMain && <span className="ml-1 text-xs text-ink-400">main</span>}
                 {s.totemsBefore !== undefined && (
@@ -49,6 +126,10 @@ export function ItemVerdict({ check }: { check: ItemCheck }) {
                 {s.percent !== undefined && s.percent !== null ? `${s.percent > 0 ? "+" : ""}${s.percent.toFixed(1)}%` : ""}
               </td>
             </tr>
+            {open === s.group && (
+              <tr><td colSpan={3} className="pb-2"><ExplainPanel check={check} group={s.group} /></td></tr>
+            )}
+            </Fragment>
           ))}
           {changedDefence.map(([k, v]) => (
             <tr key={k} className="border-t border-ink-800">

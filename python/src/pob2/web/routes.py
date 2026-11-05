@@ -102,6 +102,12 @@ class ItemCheck(BaseModel):
     slot: str | None = Field(None, description="Slot to test in (default: where it does best)")
 
 
+class ItemExplain(BaseModel):
+    text: str = Field(description="Item text, as for the check")
+    slot: str = Field(description="Slot the check chose (check.slot)")
+    group: int = Field(description="Socket group of the skill to explain (skills[].group)")
+
+
 class ShopSearch(BaseModel):
     slot: str | None = Field(None, description="Slot to search for (uses its weighted trade query)")
     query: dict[str, Any] | None = Field(None, description="A weighted trade query, e.g. from the rare designer")
@@ -539,7 +545,13 @@ def budget() -> Any:
 
 @router.post("/items/check")
 def check_item(body: ItemCheck) -> Any:
-    return svc().check_item(body.text, body.slot)
+    # The text rides along so the UI can ask "why?" about a skill row without keeping its own copy.
+    return {**svc().check_item(body.text, body.slot), "itemText": body.text}
+
+
+@router.post("/items/explain")
+def explain_item(body: ItemExplain) -> Any:
+    return svc().explain_item(body.text, body.slot, body.group)
 
 
 # -- reference build -------------------------------------------------------------------------------

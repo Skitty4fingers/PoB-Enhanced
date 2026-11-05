@@ -257,6 +257,31 @@ export interface ItemCheck {
   skills: { group: number; name: string; isMain?: boolean; before: number; after: number; percent?: number; totemsBefore?: number; totemsAfter?: number; lost?: boolean }[];
   defence: Record<string, { before: number; after: number }>;
   caveat: string;
+  /** The item text that was checked (the REST check echoes it so a skill row can ask "why?"). */
+  itemText?: string;
+}
+
+export interface ItemExplainLine {
+  text: string;
+  kind: string;
+  /** Share of the skill's damage this line provides (what removing just it would cost). */
+  percent: number;
+}
+
+export interface ItemExplain {
+  skill: string;
+  group: number;
+  slot: string;
+  replaces?: string;
+  item: string;
+  before: number;
+  after: number;
+  percent?: number;
+  totemsBefore?: number;
+  totemsAfter?: number;
+  lost: ItemExplainLine[];
+  gained: ItemExplainLine[];
+  moved: { key: string; label: string; before: number; after: number; percent: number; pct?: boolean }[];
 }
 
 export interface TreeNodeInfo {

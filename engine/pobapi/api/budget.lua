@@ -494,4 +494,119 @@ function M.check_item(params)
 	}
 end
 
+-- Why does the item change a skill's damage? Which mod lines of the current item carry it, which lines of the new item
+-- bring it back, and which stats moved. Lines are measured one at a time (removing just that line), so shares overlap:
+-- damage multiplies, the shares do not add up to the total.
+local LINE_LISTS = { "enchantModLines", "runeModLines", "implicitModLines", "explicitModLines" }
+local EXPLAIN_STATS = {
+	{ key = "Speed", label = "Casts / attacks per second" },
+	{ key = "HitChance", label = "Hit chance", pct = true },
+	{ key = "CritChance", label = "Critical hit chance", pct = true },
+	{ key = "CritMultiplier", label = "Critical hit multiplier" },
+	{ key = "PhysicalHitAverage", label = "Physical damage per hit" },
+	{ key = "FireHitAverage", label = "Fire damage per hit" },
+	{ key = "ColdHitAverage", label = "Cold damage per hit" },
+	{ key = "LightningHitAverage", label = "Lightning damage per hit" },
+	{ key = "ChaosHitAverage", label = "Chaos damage per hit" },
+	{ key = "AverageHit", label = "Average damage per hit" },
+	{ key = "TotalDPS", label = "Damage per second (one totem)" },
+}
+
+local function lineWorth(b, calcFunc, ctx, group, slotName, item, fullDps)
+	local rows = util.array()
+	for _, key in ipairs(LINE_LISTS) do
+		for i, line in ipairs(item[key] or { }) do
+			if line.line and line.line ~= "" then
+				local copy = new("Item"):Item(item:BuildRaw())
+				copy:NormaliseQuality()
+				if copy[key] and copy[key][i] then
+					table.remove(copy[key], i)
+					copy:BuildAndParseRaw()
+					copy:BuildModList()
+					local out = calcFunc({ mainSocketGroup = group, repSlotName = slotName, repItem = copy })
+					local without = M._effectiveDps(out, M._summarize(out, ctx, group))
+					rows[#rows + 1] = {
+						text = util.strip(line.line),
+						kind = key:gsub("ModLines$", ""),
+						-- Share of the skill's damage this line provides: what removing it would cost.
+						percent = fullDps > 0 and (fullDps - without) / fullDps * 100 or 0,
+						without = without,
+					}
+				end
+			end
+		end
+	end
+	table.sort(rows, function(a, c) return math.abs(a.percent) > math.abs(c.percent) end)
+	return rows
+end
+
+local function keepSignificant(rows, limit)
+	local kept = util.array()
+	for _, r in ipairs(rows) do
+		if #kept >= limit then break end
+		if math.abs(r.percent) >= 0.5 then kept[#kept + 1] = r end
+	end
+	return kept
+end
+
+function M.explain_item(params)
+	local b = session.build()
+	local item = new("Item"):Item(util.require(params, "text", "string"))
+	if not item.base then
+		util.fail("Could not parse item (unknown base type)")
+	end
+	item:NormaliseQuality()
+	item:BuildModList()
+	local group = tonumber(util.require(params, "group", "number"))
+	local slotName = util.require(params, "slot", "string")
+	if not b.itemsTab.slots[slotName] then
+		util.fail("Unknown slot: " .. slotName)
+	end
+	local sg = b.skillsTab.socketGroupList[group]
+	if not sg then
+		util.fail("No socket group " .. tostring(group))
+	end
+	local ctx = M._context(b)
+	local calcFunc = M._calculator(b)
+	local before = calcFunc({ mainSocketGroup = group })
+	local after = calcFunc({ mainSocketGroup = group, repSlotName = slotName, repItem = item })
+	local sb, sa = M._summarize(before, ctx, group), M._summarize(after, ctx, group)
+	local eb, ea = M._effectiveDps(before, sb), M._effectiveDps(after, sa)
+	local current = b.itemsTab.items[b.itemsTab.slots[slotName].selItemId]
+
+	-- The current item's lines: what you lose. The new item's lines: what you get.
+	local lost = current and keepSignificant(lineWorth(b, calcFunc, ctx, group, slotName, current, eb), 8) or util.array()
+	local gained = keepSignificant(lineWorth(b, calcFunc, ctx, group, slotName, item, ea), 6)
+
+	-- The stats that make up the skill's damage, when they moved.
+	local moved = util.array()
+	for _, def in ipairs(EXPLAIN_STATS) do
+		local v, w = before[def.key], after[def.key]
+		if type(v) == "number" and type(w) == "number" and v ~= w then
+			local rel = v ~= 0 and (w - v) / math.abs(v) * 100 or (w > 0 and 100 or 0)
+			if math.abs(rel) >= 0.5 then
+				moved[#moved + 1] = { key = def.key, label = def.label, before = v, after = w, percent = rel, pct = def.pct or nil }
+			end
+		end
+	end
+
+	local ge = sg.displaySkillList and sg.displaySkillList[#sg.displaySkillList]
+	ge = ge and ge.activeEffect and ge.activeEffect.grantedEffect
+	return {
+		skill = ge and ge.name or ("Group " .. group),
+		group = group,
+		slot = slotName,
+		replaces = current and current.name or nil,
+		item = item.name,
+		before = eb,
+		after = ea,
+		percent = eb > 0 and (ea / eb - 1) * 100 or nil,
+		totemsBefore = sb.totems,
+		totemsAfter = sa.totems,
+		lost = lost,
+		gained = gained,
+		moved = moved,
+	}
+end
+
 return M

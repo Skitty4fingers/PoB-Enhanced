@@ -639,6 +639,10 @@ class PoBService:
         """Check before you buy: verdict, every damage skill (totems counted), Spirit/totems, defences, requirements."""
         return self.call("budget.check_item", text=text, slot=slot)
 
+    def explain_item(self, text: str, slot: str, group: int) -> dict[str, Any]:
+        """Why one skill's damage changes when the item goes in: the lines that carry it, and the stats that moved."""
+        return self.call("budget.explain_item", text=text, slot=slot, group=group)
+
     # -- gear, shopping and gems ---------------------------------------------------------------------
 
     def _memoised(self, key: tuple[Any, ...], fn: Any) -> Any:

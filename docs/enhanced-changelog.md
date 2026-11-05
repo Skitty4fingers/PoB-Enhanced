@@ -20,6 +20,10 @@ are in `CHANGELOG.md`. The version number lives in `python/pyproject.toml`.
 
 ## Unreleased
 
+- **Why did this skill change?** Click a skill row in the item check to see the mod lines of the replaced item that carry
+  its damage (what you lose), the new item's lines that bring some back, and the stats that moved (damage per hit by
+  type, speed, crit). New `explain_item_change` MCP tool and `POST /api/items/explain`; the REST check now echoes the
+  item text.
 - Item check: replacing an item that grants a skill (Sacred Flame's Purity of Fire) no longer reports the skill as lost
   when the new item grants it too.
 - **Jewel plan** (Jewels tab, `suggest_unique_jewels` -> `plan`): jewels are picked one after another and
