@@ -52,6 +52,10 @@ jobs:
           file: docker/enhanced.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          # Attestation manifests add unknown/unknown entries to the index, which breaks the update check in
+          # Unraid and some other UIs ("up to date" when it is not). Keep the index to the two real platforms.
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
